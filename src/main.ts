@@ -200,40 +200,47 @@ function effectiveStatus(n: Node): Status {
   return s;
 }
 
-// --- Seed tree (placeholder content) ---------------------------------------
-const TITLES = [
-  'Landing page', 'Auth flow', 'Billing', 'Onboarding', 'Search', 'Settings',
-  'Dashboard', 'Notifications', 'Mobile layout', 'Dark mode', 'Analytics',
-  'Export', 'Import', 'Webhooks', 'Rate limiting', 'Caching', 'Migrations',
-  'Docs', 'Changelog', 'Pricing', 'Support inbox', 'Bug triage', 'Refactor',
-  'Test coverage', 'CI pipeline', 'Deploy', 'Backups', 'Monitoring', 'Theming',
-];
-let titleCursor = 0;
-const nextTitle = (): string => TITLES[titleCursor++ % TITLES.length];
-const randStatus = (): Status => {
-  const r = Math.random();
-  return r < 0.45 ? 'todo' : r < 0.75 ? 'doing' : 'done';
-};
-function makeTree(depth: number, fanout: number): Node[] {
-  if (depth <= 0) return [];
-  const n = 1 + Math.floor(Math.random() * fanout);
-  const out: Node[] = [];
-  for (let i = 0; i < n; i++) {
-    out.push({
-      title: nextTitle(),
-      status: randStatus(),
-      children: Math.random() < 0.85 ? makeTree(depth - 1, Math.max(2, fanout - 1)) : [],
-    });
-  }
-  return out;
+// --- Demo seed --------------------------------------------------------------
+// A first-time board that explains itself: three projects, each drilling six
+// levels deep — Project → Task → Subtask → Step → Item → Detail. Status is
+// fractal: a "doing" board splits into a DONE branch, a TO-DO branch, and a
+// mixed branch that recurses, so the derived-status roll-up is legible at every
+// zoom. Result: Project 1 reads done (green), Project 2 in-progress (amber),
+// Project 3 not-started (blue) — and the same pattern repeats all the way down.
+const DEMO_LEVELS = ['Project', 'Task', 'Subtask', 'Step', 'Item', 'Detail'];
+const DEMO_FANOUT = [3, 3, 3, 2, 2, 2]; // children at each depth (index 0 = the projects)
+const DEMO_MIX: Status[] = ['doing', 'done', 'todo', 'doing', 'todo', 'done'];
+
+function demoTree(): Node {
+  let seq = 0;
+  const build = (depth: number, forced: Status | null): Node[] => {
+    if (depth >= DEMO_LEVELS.length) return [];
+    const n = DEMO_FANOUT[depth];
+    const out: Node[] = [];
+    for (let i = 0; i < n; i++) {
+      // A mixed board fans out as [done branch, …mixed…, to-do branch]; once a
+      // branch is forced it carries that status all the way down (clean, single-
+      // colour subtree). Leaves with no forced status cycle a lively mix.
+      const childForced: Status | null =
+        forced !== null ? forced : i === 0 ? 'done' : i === n - 1 ? 'todo' : null;
+      const children = build(depth + 1, childForced);
+      const status: Status =
+        children.length === 0 ? (childForced ?? DEMO_MIX[seq++ % DEMO_MIX.length]) : 'todo';
+      out.push({ title: `${DEMO_LEVELS[depth]} ${i + 1}`, status, children });
+    }
+    return out;
+  };
+  return { title: 'Kandelbrot', status: 'doing', children: build(0, null) };
 }
+
 // --- Persistence ------------------------------------------------------------
 // The board lives in localStorage: seeded once, reloaded on startup, re-saved
 // after every change. (To start fresh: localStorage.removeItem the key below.)
-const STORAGE_KEY = 'kandelbrot.v1';
+// Bumped to v2 with the self-describing demo seed (v1 was the old random tree).
+const STORAGE_KEY = 'kandelbrot.v2';
 
 function freshTree(): Node {
-  return { title: 'Kandelbrot', status: 'doing', children: makeTree(4, 6) };
+  return demoTree();
 }
 
 function loadTree(): Node | null {
