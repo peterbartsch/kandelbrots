@@ -1,3 +1,21 @@
+/* Theme variables — overwritten at runtime by applyTheme() in main.ts.
+   Defaults below are the Tron palette so there's no flash before JS runs.
+   --line / --accent / --todo / --doing / --done are "R G B" triplets so the
+   DOM can alpha them with rgb(var(--x) / a). --glow (0..1) gates the neon
+   bloom so light/flat themes drop the glow entirely. */
+:root {
+  --bg: radial-gradient(ellipse at 60% 38%, #0a1622 0%, #04070e 58%, #01030a 100%);
+  --panel-bg: linear-gradient(180deg, rgba(6, 14, 24, 0.82), rgba(3, 8, 16, 0.82));
+  --text: rgba(214, 248, 255, 0.98);
+  --text-dim: rgba(120, 200, 230, 0.62);
+  --line: 44 224 255;
+  --accent: 255 174 52;
+  --todo: 58 150 255;
+  --doing: 255 174 52;
+  --done: 47 240 200;
+  --glow: 1;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -8,7 +26,7 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  background: radial-gradient(ellipse at 60% 38%, #0a1622 0%, #04070e 58%, #01030a 100%);
+  background: var(--bg);
 }
 
 #stage {
@@ -33,10 +51,10 @@ body {
   flex-direction: column;
   gap: 18px;
   padding: 18px 16px;
-  background: linear-gradient(180deg, rgba(6, 14, 24, 0.82), rgba(3, 8, 16, 0.82));
-  border-left: 1px solid rgba(44, 224, 255, 0.32);
+  background: var(--panel-bg);
+  border-left: 1px solid rgb(var(--line) / 0.32);
   box-shadow:
-    inset 1px 0 16px rgba(44, 224, 255, 0.05),
+    inset 1px 0 16px rgb(var(--line) / calc(0.05 * var(--glow))),
     -3px 0 24px rgba(0, 0, 0, 0.45);
   overflow-y: auto;
   user-select: none;
@@ -46,58 +64,9 @@ body {
   font: 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(44, 224, 255, 0.55);
-  text-shadow: 0 0 6px rgba(44, 224, 255, 0.3);
+  color: rgb(var(--line) / 0.55);
+  text-shadow: 0 0 6px rgb(var(--line) / calc(0.3 * var(--glow)));
   margin-bottom: 8px;
-}
-
-/* ---- Nested-frames navigator (bigger now) -------------------------------- */
-.zlevel {
-  border: 1px solid rgba(44, 224, 255, 0.3);
-  border-radius: 4px;
-  padding: 0 9px 9px;
-  background: rgba(4, 12, 20, 0.3);
-  box-shadow: inset 0 0 12px rgba(44, 224, 255, 0.04);
-}
-
-.zlevel.current {
-  border-color: rgba(120, 230, 255, 0.85);
-  background: rgba(8, 22, 34, 0.5);
-  box-shadow:
-    0 0 18px rgba(44, 224, 255, 0.28),
-    inset 0 0 12px rgba(44, 224, 255, 0.1);
-}
-
-.zlabel {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 7px 4px 8px;
-  font: 13px/1 ui-monospace, "SF Mono", Menlo, monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: rgba(120, 210, 240, 0.62);
-  text-shadow: 0 0 6px rgba(44, 224, 255, 0.22);
-  transition:
-    color 0.12s,
-    text-shadow 0.12s;
-}
-
-.zlabel:hover {
-  color: rgba(205, 248, 255, 1);
-  text-shadow: 0 0 10px rgba(44, 224, 255, 0.7);
-}
-
-.zlevel.current > .zlabel {
-  color: rgba(210, 250, 255, 1);
-  text-shadow: 0 0 12px rgba(44, 224, 255, 0.6);
-  cursor: default;
 }
 
 /* ---- Contextual focus info ----------------------------------------------- */
@@ -110,8 +79,8 @@ body {
 #pi-title {
   font: 600 19px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.02em;
-  color: rgba(214, 248, 255, 0.98);
-  text-shadow: 0 0 12px rgba(44, 224, 255, 0.35);
+  color: var(--text);
+  text-shadow: 0 0 12px rgb(var(--line) / calc(0.35 * var(--glow)));
   word-break: break-word;
 }
 
@@ -125,8 +94,8 @@ body {
   font: 11px/1 ui-monospace, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  border: 1px solid rgba(44, 224, 255, 0.3);
-  color: rgba(200, 240, 255, 0.9);
+  border: 1px solid rgb(var(--line) / 0.3);
+  color: var(--text);
 }
 
 .status-chip::before {
@@ -138,16 +107,16 @@ body {
 }
 
 .status-chip.todo::before {
-  background: #3a96ff;
-  box-shadow: 0 0 9px #3a96ff;
+  background: rgb(var(--todo));
+  box-shadow: 0 0 9px rgb(var(--todo) / calc(1 * var(--glow)));
 }
 .status-chip.doing::before {
-  background: #ffae34;
-  box-shadow: 0 0 9px #ffae34;
+  background: rgb(var(--doing));
+  box-shadow: 0 0 9px rgb(var(--doing) / calc(1 * var(--glow)));
 }
 .status-chip.done::before {
-  background: #2ff0c8;
-  box-shadow: 0 0 9px #2ff0c8;
+  background: rgb(var(--done));
+  box-shadow: 0 0 9px rgb(var(--done) / calc(1 * var(--glow)));
 }
 
 #pi-bar {
@@ -155,146 +124,66 @@ body {
   height: 8px;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(44, 224, 255, 0.06);
-  border: 1px solid rgba(44, 224, 255, 0.15);
+  background: rgb(var(--line) / 0.06);
+  border: 1px solid rgb(var(--line) / 0.15);
 }
 
 #pi-bar .seg.todo {
-  background: #3a96ff;
+  background: rgb(var(--todo));
 }
 #pi-bar .seg.doing {
-  background: #ffae34;
+  background: rgb(var(--doing));
 }
 #pi-bar .seg.done {
-  background: #2ff0c8;
+  background: rgb(var(--done));
 }
 
 #pi-meta {
   font: 11px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(120, 200, 230, 0.6);
+  color: var(--text-dim);
 }
 
-/* derived vs pinned indicator (pinned runs amber, the override colour) */
+/* derived vs pinned indicator (pinned runs on the accent, the override colour) */
 .pi-pin {
   align-self: flex-start;
   background: none;
-  border: 1px solid rgba(44, 224, 255, 0.22);
+  border: 1px solid rgb(var(--line) / 0.22);
   border-radius: 999px;
   padding: 5px 12px;
   font: 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(110, 190, 220, 0.65);
+  color: var(--text-dim);
   cursor: default;
 }
 
 .pi-pin.pinned {
-  color: rgba(255, 224, 160, 1);
-  border-color: rgba(255, 174, 52, 0.6);
-  background: rgba(40, 22, 4, 0.5);
-  box-shadow: 0 0 12px rgba(255, 174, 52, 0.25);
+  color: rgb(var(--accent));
+  border-color: rgb(var(--accent) / 0.6);
+  background: rgb(var(--accent) / 0.1);
+  box-shadow: 0 0 12px rgb(var(--accent) / calc(0.25 * var(--glow)));
   cursor: pointer;
 }
 
 .pi-pin.pinned:hover {
-  box-shadow: 0 0 18px rgba(255, 174, 52, 0.45);
-}
-
-/* ---- Children list (click to fly to one) --------------------------------- */
-#panel-children {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-#child-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-}
-
-.child-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  text-align: left;
-  background: rgba(8, 18, 30, 0.4);
-  border: 1px solid rgba(44, 224, 255, 0.14);
-  border-radius: 3px;
-  padding: 8px 10px;
-  cursor: pointer;
-  font: 12px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
-  color: rgba(190, 230, 245, 0.85);
-  transition:
-    background 0.1s,
-    border-color 0.1s;
-}
-
-.child-item:hover {
-  background: rgba(16, 36, 52, 0.7);
-  border-color: rgba(44, 224, 255, 0.4);
-}
-
-.child-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #5a6b7a;
-}
-
-.child-item.todo .child-dot {
-  background: #3a96ff;
-  box-shadow: 0 0 8px #3a96ff;
-}
-.child-item.doing .child-dot {
-  background: #ffae34;
-  box-shadow: 0 0 8px #ffae34;
-}
-.child-item.done .child-dot {
-  background: #2ff0c8;
-  box-shadow: 0 0 8px #2ff0c8;
-}
-
-.child-label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.child-del {
-  flex: 0 0 auto;
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: rgba(120, 160, 180, 0.5);
-  font: 15px/1 ui-monospace, monospace;
-  padding: 0 2px;
-  transition: color 0.12s;
-}
-
-.child-del:hover {
-  color: rgba(255, 120, 120, 0.95);
+  box-shadow: 0 0 18px rgb(var(--accent) / calc(0.45 * var(--glow)));
+  background: rgb(var(--accent) / 0.16);
 }
 
 #add-card {
   margin-top: 8px;
   width: 100%;
   background: none;
-  border: 1px dashed rgba(44, 224, 255, 0.3);
+  border: 1px dashed rgb(var(--line) / 0.3);
   border-radius: 3px;
   padding: 8px;
   cursor: pointer;
   font: 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(120, 200, 230, 0.7);
+  color: var(--text-dim);
   transition:
     background 0.12s,
     border-color 0.12s,
@@ -302,9 +191,9 @@ body {
 }
 
 #add-card:hover {
-  border-color: rgba(44, 224, 255, 0.6);
-  color: rgba(205, 248, 255, 1);
-  background: rgba(16, 36, 52, 0.5);
+  border-color: rgb(var(--line) / 0.6);
+  color: var(--text);
+  background: rgb(var(--line) / 0.08);
 }
 
 #rename-input {
@@ -312,13 +201,13 @@ body {
   display: none;
   z-index: 100;
   padding: 2px 6px;
-  background: rgba(2, 10, 18, 0.97);
-  border: 1px solid rgba(120, 230, 255, 0.9);
+  background: var(--panel-bg);
+  border: 1px solid rgb(var(--line));
   border-radius: 3px;
-  color: rgba(214, 248, 255, 1);
+  color: var(--text);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   outline: none;
-  box-shadow: 0 0 16px rgba(44, 224, 255, 0.4);
+  box-shadow: 0 0 16px rgb(var(--line) / calc(0.4 * var(--glow)));
 }
 
 #scanlines {
@@ -355,13 +244,13 @@ body {
   padding: 5px 8px 5px 6px;
   cursor: pointer;
   font: 12px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
-  color: rgba(170, 215, 235, 0.78);
+  color: var(--text-dim);
   border-left: 2px solid transparent;
   transition: background 0.1s;
 }
 
 .tree-row:hover {
-  background: rgba(20, 40, 56, 0.5);
+  background: rgb(var(--line) / 0.1);
 }
 
 .tree-row:hover .tree-del {
@@ -369,9 +258,9 @@ body {
 }
 
 .tree-row.current {
-  background: rgba(16, 40, 58, 0.75);
-  border-left-color: rgba(120, 230, 255, 0.9);
-  color: rgba(214, 248, 255, 1);
+  background: rgb(var(--line) / 0.16);
+  border-left-color: rgb(var(--line) / 0.9);
+  color: var(--text);
 }
 
 .tree-tog {
@@ -379,7 +268,7 @@ body {
   width: 12px;
   text-align: center;
   font-size: 10px;
-  color: rgba(120, 200, 230, 0.6);
+  color: rgb(var(--line) / 0.6);
 }
 
 .tree-dot {
@@ -391,16 +280,16 @@ body {
 }
 
 .tree-dot.todo {
-  background: #3a96ff;
-  box-shadow: 0 0 7px #3a96ff;
+  background: rgb(var(--todo));
+  box-shadow: 0 0 7px rgb(var(--todo) / calc(1 * var(--glow)));
 }
 .tree-dot.doing {
-  background: #ffae34;
-  box-shadow: 0 0 7px #ffae34;
+  background: rgb(var(--doing));
+  box-shadow: 0 0 7px rgb(var(--doing) / calc(1 * var(--glow)));
 }
 .tree-dot.done {
-  background: #2ff0c8;
-  box-shadow: 0 0 7px #2ff0c8;
+  background: rgb(var(--done));
+  box-shadow: 0 0 7px rgb(var(--done) / calc(1 * var(--glow)));
 }
 
 .tree-label {
@@ -416,7 +305,7 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(120, 160, 180, 0.6);
+  color: var(--text-dim);
   font: 14px/1 ui-monospace, monospace;
   padding: 0 2px;
   transition:
@@ -428,30 +317,64 @@ body {
   color: rgba(255, 120, 120, 0.95);
 }
 
+/* ---- Theme picker --------------------------------------------------------- */
+#theme-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+#theme-select {
+  width: 100%;
+  font: 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgb(var(--line) / 0.06);
+  border: 1px solid rgb(var(--line) / 0.4);
+  border-radius: 3px;
+  padding: 9px 10px;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+#theme-select:hover {
+  border-color: rgb(var(--line) / 0.75);
+  background: rgb(var(--line) / 0.1);
+}
+
+#theme-select option {
+  /* OS-rendered menu — reset to legible defaults regardless of theme */
+  color: #111;
+  background: #fff;
+}
+
 #hud {
-  margin-top: auto;
   font: 10px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(80, 140, 165, 0.5);
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 /* ---- Floating overlays + toolbar ----------------------------------------- */
 .overlay {
   position: fixed;
-  color: rgba(120, 200, 230, 0.7);
+  color: var(--text-dim);
   font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   pointer-events: none;
   user-select: none;
-  text-shadow: 0 0 8px rgba(44, 224, 255, 0.4);
+  text-shadow: 0 0 8px rgb(var(--line) / calc(0.4 * var(--glow)));
 }
 
 #hint {
   left: 16px;
   bottom: 14px;
-  color: rgba(90, 150, 175, 0.5);
+  color: var(--text-dim);
   text-shadow: none;
 }
 
@@ -467,32 +390,32 @@ body {
   font: 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: rgba(150, 235, 255, 0.95);
-  background: rgba(4, 12, 20, 0.6);
-  border: 1px solid rgba(44, 224, 255, 0.55);
+  color: rgb(var(--line));
+  background: rgb(var(--line) / 0.06);
+  border: 1px solid rgb(var(--line) / 0.55);
   border-radius: 2px;
   padding: 10px 16px;
   cursor: pointer;
   user-select: none;
-  text-shadow: 0 0 8px rgba(44, 224, 255, 0.5);
+  text-shadow: 0 0 8px rgb(var(--line) / calc(0.5 * var(--glow)));
   box-shadow:
-    0 0 14px rgba(44, 224, 255, 0.18),
-    inset 0 0 10px rgba(44, 224, 255, 0.06);
+    0 0 14px rgb(var(--line) / calc(0.18 * var(--glow))),
+    inset 0 0 10px rgb(var(--line) / calc(0.06 * var(--glow)));
   transition: all 0.12s ease;
 }
 
 #toolbar button:hover {
-  background: rgba(10, 28, 40, 0.8);
-  box-shadow: 0 0 22px rgba(44, 224, 255, 0.35);
+  background: rgb(var(--line) / 0.12);
+  box-shadow: 0 0 22px rgb(var(--line) / calc(0.35 * var(--glow)));
 }
 
-/* Arrange mode runs hot — amber, the energized counter-colour. */
+/* Arrange mode runs hot — on the accent, the energized counter-colour. */
 #mode-toggle.on {
-  color: rgba(255, 224, 160, 1);
-  background: rgba(40, 22, 4, 0.8);
-  border-color: rgba(255, 174, 52, 0.85);
-  text-shadow: 0 0 10px rgba(255, 174, 52, 0.7);
+  color: rgb(var(--accent));
+  background: rgb(var(--accent) / 0.12);
+  border-color: rgb(var(--accent) / 0.85);
+  text-shadow: 0 0 10px rgb(var(--accent) / calc(0.7 * var(--glow)));
   box-shadow:
-    0 0 22px rgba(255, 174, 52, 0.4),
-    inset 0 0 12px rgba(255, 174, 52, 0.12);
+    0 0 22px rgb(var(--accent) / calc(0.4 * var(--glow))),
+    inset 0 0 12px rgb(var(--accent) / calc(0.12 * var(--glow)));
 }

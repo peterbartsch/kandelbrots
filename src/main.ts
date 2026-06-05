@@ -14,16 +14,132 @@ import './style.css';
 type Status = 'todo' | 'doing' | 'done';
 const COLUMNS: Status[] = ['todo', 'doing', 'done'];
 const COLUMN_LABEL: Record<Status, string> = { todo: 'To-do', doing: 'Doing', done: 'Done' };
-// Tron palette: electric blue (idle) → amber (energized) → teal (resolved),
-// all glowing cyan on a black grid.
-const STATUS_COLOR: Record<Status, string> = {
-  todo: 'rgb(58,150,255)',
-  doing: 'rgb(255,174,52)',
-  done: 'rgb(47,240,200)',
+// --- Themes -----------------------------------------------------------------
+// Every colour the app paints comes from the active Theme. The canvas reads the
+// `theme` object directly each frame; the DOM panel restyles via CSS variables
+// pushed in applyTheme(). `glow` (0..1) scales the neon bloom so flat/light
+// palettes read as clean lines instead of Tron neon.
+type RGB = [number, number, number];
+const rgb = (c: RGB): string => `rgb(${c[0]},${c[1]},${c[2]})`;
+const rgba = (c: RGB, a: number): string => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+interface Theme {
+  label: string;
+  dark: boolean;
+  glow: number; // 0 = flat (light/print), 1 = full neon bloom
+  scanlines: boolean;
+  bg: string; // page background (CSS, may be a gradient)
+  panelBg: string; // inspector panel background (CSS)
+  cardFill: string; // translucent card interior
+  scrim: string; // dim-outside overlay (Arrange)
+  text: string; // bright text — card + panel titles
+  textDim: string; // dim text — labels / meta
+  line: RGB; // primary stroke: card borders, chrome, traces, grid focus
+  lineCore: RGB; // bright filament highlight
+  grid: RGB;
+  gridA: number; // grid alpha multiplier (lighter themes need more)
+  accent: RGB; // energized / Arrange mode (Tron's amber)
+  accentCore: RGB;
+  todo: RGB;
+  doing: RGB;
+  done: RGB;
+}
+
+const THEMES: Record<string, Theme> = {
+  tron: {
+    label: 'Tron', dark: true, glow: 1, scanlines: true,
+    bg: 'radial-gradient(ellipse at 60% 38%, #0a1622 0%, #04070e 58%, #01030a 100%)',
+    panelBg: 'linear-gradient(180deg, rgba(6,14,24,0.82), rgba(3,8,16,0.82))',
+    cardFill: 'rgba(8,18,30,0.55)', scrim: 'rgba(2,6,13,0.72)',
+    text: 'rgba(214,248,255,0.98)', textDim: 'rgba(120,200,230,0.62)',
+    line: [44, 224, 255], lineCore: [154, 246, 255], grid: [44, 224, 255], gridA: 1,
+    accent: [255, 174, 52], accentCore: [255, 221, 150],
+    todo: [58, 150, 255], doing: [255, 174, 52], done: [47, 240, 200],
+  },
+  midnight: {
+    label: 'Midnight', dark: true, glow: 0.4, scanlines: false,
+    bg: 'radial-gradient(ellipse at 50% 30%, #1b1f27 0%, #15171d 60%, #0e1014 100%)',
+    panelBg: 'linear-gradient(180deg, #181b22, #121419)',
+    cardFill: 'rgba(30,34,42,0.6)', scrim: 'rgba(8,9,12,0.72)',
+    text: '#e6e9ef', textDim: 'rgba(160,170,185,0.7)',
+    line: [120, 170, 210], lineCore: [205, 222, 240], grid: [120, 140, 170], gridA: 0.8,
+    accent: [240, 185, 95], accentCore: [255, 212, 150],
+    todo: [90, 160, 250], doing: [240, 190, 90], done: [90, 205, 145],
+  },
+  paper: {
+    label: 'Paper (light)', dark: false, glow: 0, scanlines: false,
+    bg: 'radial-gradient(ellipse at 50% 30%, #fbfaf6 0%, #efece3 100%)',
+    panelBg: '#eceae2', cardFill: 'rgba(255,255,255,0.72)', scrim: 'rgba(244,241,234,0.7)',
+    text: '#2a2c33', textDim: 'rgba(90,95,110,0.85)',
+    line: [95, 105, 125], lineCore: [55, 62, 80], grid: [120, 125, 140], gridA: 1.4,
+    accent: [205, 115, 35], accentCore: [165, 80, 15],
+    todo: [40, 110, 210], doing: [200, 130, 20], done: [40, 150, 90],
+  },
+  'solarized-dark': {
+    label: 'Solarized Dark', dark: true, glow: 0.35, scanlines: false,
+    bg: '#002b36', panelBg: '#073642', cardFill: 'rgba(7,54,66,0.55)', scrim: 'rgba(0,20,26,0.72)',
+    text: '#93a1a1', textDim: 'rgba(131,148,150,0.72)',
+    line: [38, 139, 210], lineCore: [147, 161, 161], grid: [88, 110, 117], gridA: 0.7,
+    accent: [203, 75, 22], accentCore: [223, 110, 60],
+    todo: [38, 139, 210], doing: [181, 137, 0], done: [133, 153, 0],
+  },
+  'solarized-light': {
+    label: 'Solarized Light', dark: false, glow: 0, scanlines: false,
+    bg: '#fdf6e3', panelBg: '#eee8d5', cardFill: 'rgba(255,252,242,0.72)', scrim: 'rgba(253,246,227,0.7)',
+    text: '#586e75', textDim: 'rgba(101,123,131,0.85)',
+    line: [38, 139, 210], lineCore: [88, 110, 117], grid: [147, 161, 161], gridA: 1.2,
+    accent: [203, 75, 22], accentCore: [170, 55, 12],
+    todo: [38, 139, 210], doing: [181, 137, 0], done: [133, 153, 0],
+  },
+  dracula: {
+    label: 'Dracula', dark: true, glow: 0.55, scanlines: false,
+    bg: 'radial-gradient(ellipse at 50% 30%, #2d2f3d 0%, #21222c 100%)',
+    panelBg: '#21222c', cardFill: 'rgba(68,71,90,0.5)', scrim: 'rgba(20,21,28,0.72)',
+    text: '#f8f8f2', textDim: 'rgba(98,114,164,0.9)',
+    line: [189, 147, 249], lineCore: [248, 248, 242], grid: [98, 114, 164], gridA: 0.6,
+    accent: [255, 121, 198], accentCore: [255, 184, 222],
+    todo: [139, 233, 253], doing: [255, 184, 108], done: [80, 250, 123],
+  },
+  nord: {
+    label: 'Nord', dark: true, glow: 0.4, scanlines: false,
+    bg: '#2e3440', panelBg: '#2b303b', cardFill: 'rgba(59,66,82,0.5)', scrim: 'rgba(20,24,31,0.7)',
+    text: '#eceff4', textDim: 'rgba(143,158,178,0.82)',
+    line: [136, 192, 208], lineCore: [236, 239, 244], grid: [76, 86, 106], gridA: 0.8,
+    accent: [180, 142, 173], accentCore: [212, 182, 206],
+    todo: [129, 161, 193], doing: [235, 203, 139], done: [163, 190, 140],
+  },
+  gruvbox: {
+    label: 'Gruvbox', dark: true, glow: 0.4, scanlines: false,
+    bg: '#282828', panelBg: '#32302f', cardFill: 'rgba(60,56,54,0.55)', scrim: 'rgba(20,20,20,0.72)',
+    text: '#ebdbb2', textDim: 'rgba(168,153,132,0.85)',
+    line: [142, 192, 124], lineCore: [235, 219, 178], grid: [146, 131, 116], gridA: 0.7,
+    accent: [254, 128, 25], accentCore: [255, 170, 90],
+    todo: [131, 165, 152], doing: [250, 189, 47], done: [184, 187, 38],
+  },
+  phosphor: {
+    label: 'Green Phosphor', dark: true, glow: 1, scanlines: true,
+    bg: 'radial-gradient(ellipse at 50% 40%, #031a08 0%, #010d04 60%, #000600 100%)',
+    panelBg: 'linear-gradient(180deg, rgba(4,22,10,0.85), rgba(1,10,4,0.85))',
+    cardFill: 'rgba(6,26,12,0.55)', scrim: 'rgba(0,8,3,0.72)',
+    text: 'rgba(180,255,190,0.96)', textDim: 'rgba(80,200,110,0.6)',
+    line: [51, 255, 102], lineCore: [190, 255, 200], grid: [51, 255, 102], gridA: 0.9,
+    accent: [120, 255, 140], accentCore: [205, 255, 215],
+    todo: [40, 200, 90], doing: [120, 255, 140], done: [220, 255, 200],
+  },
+  amber: {
+    label: 'Amber CRT', dark: true, glow: 1, scanlines: true,
+    bg: 'radial-gradient(ellipse at 50% 40%, #1a0f00 0%, #0d0700 60%, #060300 100%)',
+    panelBg: 'linear-gradient(180deg, rgba(22,13,2,0.85), rgba(10,6,1,0.85))',
+    cardFill: 'rgba(26,16,4,0.55)', scrim: 'rgba(8,4,0,0.72)',
+    text: 'rgba(255,210,140,0.96)', textDim: 'rgba(220,150,40,0.6)',
+    line: [255, 176, 0], lineCore: [255, 224, 160], grid: [255, 176, 0], gridA: 0.9,
+    accent: [255, 120, 40], accentCore: [255, 184, 120],
+    todo: [200, 120, 0], doing: [255, 176, 0], done: [255, 224, 160],
+  },
 };
-const CYAN_RGB: [number, number, number] = [44, 224, 255]; // primary neon
-const CYAN_CORE = 'rgba(154,246,255,1)'; // bright filament
-const GRID_RGB: [number, number, number] = [44, 224, 255];
+
+let theme: Theme = THEMES.tron;
+const statusColor = (s: Status): string => rgb(theme[s]);
 
 interface Node {
   title: string;
@@ -163,6 +279,51 @@ const exportBtn = document.getElementById('export-btn') as HTMLButtonElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const renameInput = document.getElementById('rename-input') as HTMLInputElement;
 const addCardBtn = document.getElementById('add-card') as HTMLButtonElement;
+const scanlinesEl = document.getElementById('scanlines')!;
+const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+
+// --- Theme application ------------------------------------------------------
+const THEME_KEY = 'kandelbrot.theme';
+function applyTheme(key: string): void {
+  const t = THEMES[key] ?? THEMES.tron;
+  theme = t;
+  const s = document.documentElement.style;
+  s.setProperty('--bg', t.bg);
+  s.setProperty('--panel-bg', t.panelBg);
+  s.setProperty('--text', t.text);
+  s.setProperty('--text-dim', t.textDim);
+  s.setProperty('--line', t.line.join(' '));
+  s.setProperty('--accent', t.accent.join(' '));
+  s.setProperty('--todo', t.todo.join(' '));
+  s.setProperty('--doing', t.doing.join(' '));
+  s.setProperty('--done', t.done.join(' '));
+  s.setProperty('--glow', String(t.glow));
+  document.documentElement.dataset.theme = key;
+  scanlinesEl.style.display = t.scanlines ? '' : 'none';
+  try {
+    localStorage.setItem(THEME_KEY, key);
+  } catch {
+    /* private mode — theme just won't persist */
+  }
+}
+for (const [key, t] of Object.entries(THEMES)) {
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = t.label;
+  themeSelect.appendChild(opt);
+}
+{
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(THEME_KEY);
+  } catch {
+    /* ignore */
+  }
+  const initial = saved && THEMES[saved] ? saved : 'tron';
+  themeSelect.value = initial;
+  applyTheme(initial);
+}
+themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 
 const cam = { x: 0, y: 0, zoom: 0.5 };
 const MIN_ZOOM = 0.01;
@@ -914,13 +1075,14 @@ piPin.addEventListener('click', () => {
 
 // Stroke the current path as a neon tube: a wide dim halo under a bright core.
 // Cheap (no shadowBlur) — that's what makes the glow affordable everywhere.
-function glow(rgb: [number, number, number], core = 0.9, scale = 1): void {
-  const [r, g, b] = rgb;
-  ctx.lineWidth = 4 * scale; // one dim halo...
-  ctx.strokeStyle = `rgba(${r},${g},${b},0.14)`;
-  ctx.stroke();
-  ctx.lineWidth = 1 * scale; // ...under one bright core (2 strokes, not 3)
-  ctx.strokeStyle = `rgba(${r},${g},${b},${core})`;
+function glow(c: RGB, core = 0.9, scale = 1): void {
+  if (theme.glow > 0.04) {
+    ctx.lineWidth = (1 + 3 * theme.glow) * scale; // one dim halo, widening with glow...
+    ctx.strokeStyle = rgba(c, 0.16 * theme.glow);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1 * scale; // ...under one bright core (the line itself, always drawn)
+  ctx.strokeStyle = rgba(c, core);
   ctx.stroke();
 }
 
@@ -932,7 +1094,7 @@ function drawGrid(): void {
   const right = toWorldX(viewW);
   const top = toWorldY(0);
   const bottom = toWorldY(viewH);
-  const [r, g, b] = GRID_RGB;
+  const [r, g, b] = theme.grid;
   for (const [mult, alpha] of [[1, 0.05] as const, [4, 0.11] as const]) {
     const s = step * mult;
     ctx.beginPath();
@@ -947,7 +1109,7 @@ function drawGrid(): void {
       ctx.lineTo(viewW, sy);
     }
     ctx.lineWidth = 1;
-    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * theme.gridA})`;
     ctx.stroke();
   }
 }
@@ -958,11 +1120,11 @@ function cardShell(sx: number, sy: number, sw: number, sh: number, status: Statu
   const radius = Math.min(10, sw * 0.06);
   ctx.beginPath();
   ctx.roundRect(sx, sy, sw, sh, radius);
-  ctx.fillStyle = 'rgba(8,18,30,0.55)';
+  ctx.fillStyle = theme.cardFill;
   ctx.fill();
-  glow(CYAN_RGB, 0.5, sw < 90 ? 0.7 : 1);
+  glow(theme.line, 0.5, sw < 90 ? 0.7 : 1);
   // status stripe, inset within the rounded corners so it needs no clip
-  ctx.fillStyle = STATUS_COLOR[status];
+  ctx.fillStyle = statusColor(status);
   ctx.fillRect(sx + 1, sy + radius, Math.max(2, Math.min(sw * 0.02, 7)), sh - radius * 2);
 }
 
@@ -970,7 +1132,7 @@ function cardTitle(sx: number, sy: number, sw: number, sh: number, title: string
   const pad = sw * 0.08;
   const titleH = sh * 0.14;
   const fontPx = Math.max(7, Math.min(titleH * 0.62, 24));
-  ctx.fillStyle = 'rgba(196,246,255,0.96)';
+  ctx.fillStyle = theme.text;
   ctx.font = `${fontPx}px ui-monospace, "SF Mono", Menlo, monospace`;
   ctx.textBaseline = 'middle';
   ctx.save();
@@ -995,7 +1157,7 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
     const radius = Math.min(10, sw * 0.06);
     ctx.save();
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(255,174,52,0.45)';
+    ctx.strokeStyle = rgba(theme.accent, 0.45);
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(sx, sy, sw, sh, radius);
@@ -1006,7 +1168,7 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
 
   const eff = effectiveStatus(node);
   if (sw < 5) {
-    ctx.fillStyle = STATUS_COLOR[eff];
+    ctx.fillStyle = statusColor(eff);
     ctx.fillRect(sx, sy, Math.max(1, sw), Math.max(1, sh));
     return;
   }
@@ -1030,13 +1192,13 @@ function drawBoard(node: Node, b: Rect): void {
     const sch = col.height * cam.zoom;
     if (scx + scw < 0 || scx > viewW || scy + sch < 0 || scy > viewH) continue;
 
-    ctx.fillStyle = 'rgba(44,224,255,0.03)';
+    ctx.fillStyle = rgba(theme.line, 0.03);
     ctx.beginPath();
     ctx.roundRect(scx, scy, scw, sch, Math.min(6, scw * 0.04));
     ctx.fill();
 
     const headFont = Math.max(6, Math.min(col.headerH * cam.zoom * 0.62, 13));
-    ctx.fillStyle = STATUS_COLOR[col.status];
+    ctx.fillStyle = statusColor(col.status);
     ctx.font = `${headFont}px ui-monospace, "SF Mono", Menlo, monospace`;
     ctx.textBaseline = 'middle';
     ctx.fillText(COLUMN_LABEL[col.status].toUpperCase(), scx + scw * 0.08, scy + col.headerH * cam.zoom * 0.55);
@@ -1076,12 +1238,12 @@ function drawTraces(node: Node, b: Rect): void {
     }
   }
   ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(44,224,255,0.06)';
+  ctx.strokeStyle = rgba(theme.line, 0.06);
   ctx.stroke();
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(44,224,255,0.3)';
+  ctx.strokeStyle = rgba(theme.line, 0.3);
   ctx.stroke();
-  ctx.fillStyle = 'rgba(154,246,255,0.85)';
+  ctx.fillStyle = rgba(theme.lineCore, 0.85);
   for (const [nx, ny] of nodes) {
     ctx.beginPath();
     ctx.arc(nx, ny, 2.2, 0, Math.PI * 2);
@@ -1091,11 +1253,11 @@ function drawTraces(node: Node, b: Rect): void {
   rails.forEach((r, i) => {
     const t = (nowMs / 2200 + i * 0.21) % 1;
     const py = r.top + t * (r.bottom - r.top);
-    ctx.fillStyle = 'rgba(44,224,255,0.16)';
+    ctx.fillStyle = rgba(theme.line, 0.16);
     ctx.beginPath();
     ctx.arc(r.x, py, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(190,248,255,0.95)';
+    ctx.fillStyle = rgba(theme.lineCore, 0.95);
     ctx.beginPath();
     ctx.arc(r.x, py, 2.4, 0, Math.PI * 2);
     ctx.fill();
@@ -1108,7 +1270,7 @@ function dimOutside(f: Focus): void {
   const R = Math.max(0, Math.min(viewW, toScreenX(f.x + f.w)));
   const T = Math.max(0, Math.min(viewH, toScreenY(f.y)));
   const B = Math.max(0, Math.min(viewH, toScreenY(f.y + f.h)));
-  ctx.fillStyle = 'rgba(2,6,13,0.72)';
+  ctx.fillStyle = theme.scrim;
   ctx.fillRect(0, 0, viewW, T);
   ctx.fillRect(0, B, viewW, viewH - B);
   ctx.fillRect(0, T, L, B - T);
@@ -1120,19 +1282,21 @@ function focusRing(f: Focus, strong: boolean): void {
   const sy = toScreenY(f.y);
   const sw = f.w * cam.zoom;
   const sh = f.h * cam.zoom;
-  // Navigate = cyan, Arrange = energized amber (the Tron duality).
-  const [r, g, b] = strong ? [255, 174, 52] : CYAN_RGB;
-  const core = strong ? 'rgba(255,221,150,1)' : CYAN_CORE;
+  // Navigate = the line colour, Arrange = the energized accent (Tron's duality).
+  const col = strong ? theme.accent : theme.line;
+  const core = strong ? theme.accentCore : theme.lineCore;
   ctx.beginPath();
   ctx.roundRect(sx, sy, sw, sh, Math.min(16, sw * 0.05));
-  ctx.lineWidth = (strong ? 12 : 8) * pulse;
-  ctx.strokeStyle = `rgba(${r},${g},${b},${0.1 * pulse})`;
-  ctx.stroke();
+  if (theme.glow > 0.04) {
+    ctx.lineWidth = (strong ? 12 : 8) * pulse * theme.glow;
+    ctx.strokeStyle = rgba(col, 0.1 * pulse);
+    ctx.stroke();
+  }
   ctx.lineWidth = strong ? 4 : 3;
-  ctx.strokeStyle = `rgba(${r},${g},${b},${strong ? 0.45 : 0.34})`;
+  ctx.strokeStyle = rgba(col, strong ? 0.5 : 0.4);
   ctx.stroke();
   ctx.lineWidth = strong ? 2 : 1.5;
-  ctx.strokeStyle = core;
+  ctx.strokeStyle = rgb(core);
   ctx.stroke();
 }
 
@@ -1152,10 +1316,10 @@ function drawDropIndicator(f: Focus): void {
   ctx.moveTo(toScreenX(col.innerX), sy);
   ctx.lineTo(toScreenX(col.innerX + col.innerW), sy);
   ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(255,174,52,0.3)';
+  ctx.strokeStyle = rgba(theme.accent, 0.3);
   ctx.stroke();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(255,221,150,1)';
+  ctx.strokeStyle = rgb(theme.accentCore);
   ctx.stroke();
 }
 
