@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Kandelbrot</title>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <aside id="panel">
+      <div id="panel-info">
+        <div class="pi-label">Focus</div>
+        <div id="pi-title"></div>
+        <div id="pi-status" class="status-chip"></div>
+        <div id="pi-bar">
+          <span class="seg todo"></span>
+          <span class="seg doing"></span>
+          <span class="seg done"></span>
+        </div>
+        <div id="pi-meta"></div>
+        <button id="pi-pin" type="button"></button>
+        <button id="add-card" type="button">+ Add card</button>
+      </div>
+      <div id="tree-wrap">
+        <div class="pi-label">Board</div>
+        <div id="tree"></div>
+      </div>
+      <div id="hud"></div>
+    </aside>
+    <div id="toolbar">
+      <button id="open-dir-btn" type="button">Folder</button>
+      <button id="import-btn" type="button">Import</button>
+      <button id="export-btn" type="button">Export</button>
+      <button id="mode-toggle" type="button">Navigate</button>
+    </div>
+    <input id="file-input" type="file" accept=".md,text/markdown" hidden />
+    <div id="hint" class="overlay">drag to pan · scroll / pinch to zoom · Tab to arrange this card</div>
+    <input id="rename-input" type="text" spellcheck="false" autocomplete="off" />
+    <div id="scanlines"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
