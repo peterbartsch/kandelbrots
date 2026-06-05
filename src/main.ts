@@ -230,7 +230,7 @@ function demoTree(): Node {
     }
     return out;
   };
-  return { title: 'Kandelbrot', status: 'doing', children: build(0, null) };
+  return { title: 'My Projects', status: 'doing', children: build(0, null) };
 }
 
 // --- Persistence ------------------------------------------------------------
@@ -264,6 +264,7 @@ function saveTree(): void {
 }
 
 let root: Node = loadTree() ?? freshTree();
+if (root.title === 'Kandelbrot') root.title = 'My Projects'; // rename the old default root in place
 saveTree(); // persist the initial seed so the board is stable across reloads
 
 // --- Canvas + camera --------------------------------------------------------
@@ -290,8 +291,8 @@ const scanlinesEl = document.getElementById('scanlines')!;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 
 // --- Theme application ------------------------------------------------------
-const THEME_KEY = 'kandelbrot.theme';
-function applyTheme(key: string): void {
+const THEME_KEY = 'kandelbrot.theme.v2'; // v2: forget the old default that used to auto-persist on first load
+function applyTheme(key: string, persist = true): void {
   const t = THEMES[key] ?? THEMES.tron;
   theme = t;
   const s = document.documentElement.style;
@@ -307,10 +308,12 @@ function applyTheme(key: string): void {
   s.setProperty('--glow', String(t.glow));
   document.documentElement.dataset.theme = key;
   scanlinesEl.style.display = t.scanlines ? '' : 'none';
-  try {
-    localStorage.setItem(THEME_KEY, key);
-  } catch {
-    /* private mode — theme just won't persist */
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_KEY, key);
+    } catch {
+      /* private mode — theme just won't persist */
+    }
   }
 }
 for (const [key, t] of Object.entries(THEMES)) {
@@ -326,9 +329,9 @@ for (const [key, t] of Object.entries(THEMES)) {
   } catch {
     /* ignore */
   }
-  const initial = saved && THEMES[saved] ? saved : 'tron';
+  const initial = saved && THEMES[saved] ? saved : 'solarized-light';
   themeSelect.value = initial;
-  applyTheme(initial);
+  applyTheme(initial, false); // auto-applied default isn't persisted — only an explicit pick sticks
 }
 themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 
@@ -457,6 +460,21 @@ let pinchDist = 0;
 let pinchMidX = 0;
 let pinchMidY = 0;
 
+// Long-press (hold still ~½s) toggles read (Navigate) ↔ edit (Arrange) — the
+// touch-friendly counterpart to Tab / the mode button. Moving or a 2nd finger
+// reclassifies the hold as a drag / pan / pinch and cancels it.
+const LONG_PRESS_MS = 480;
+const LP_MOVE_TOL = 8;
+let lpTimer: number | null = null;
+let lpStartX = 0;
+let lpStartY = 0;
+const cancelLongPress = (): void => {
+  if (lpTimer !== null) {
+    clearTimeout(lpTimer);
+    lpTimer = null;
+  }
+};
+
 // Snap-on-settle: zoom stays smooth, then eases to frame the nearest level at rest.
 const SETTLE_MS = 150; // quiet time after the last wheel event before we snap
 const SNAP_MS = 300; // settle-snap after a wheel gesture — quick & subtle
@@ -487,8 +505,8 @@ function setMode(m: Mode): void {
   btn.classList.toggle('on', m === 'arrange');
   hint.textContent =
     m === 'arrange'
-      ? 'drag cards between columns · drag the background to pan · Tab or Esc to exit'
-      : 'double-click a card to zoom to it · drag to pan · scroll / pinch zoom · Tab to arrange';
+      ? 'drag cards between columns · long-press, Tab or Esc to finish editing'
+      : 'double-click a card to zoom · long-press to edit · drag to pan · pinch / scroll to zoom';
 }
 
 // --- Pan / drag input -------------------------------------------------------
@@ -504,7 +522,8 @@ canvas.addEventListener('pointerdown', (e: PointerEvent) => {
   pendingSnap = false;
 
   if (pointers.size === 2) {
-    // second finger down → start a pinch; abandon any pan / card-drag
+    // second finger down → start a pinch; abandon any pan / card-drag / long-press
+    cancelLongPress();
     drag = null;
     panning = false;
     const [a, b] = [...pointers.values()];
@@ -517,6 +536,16 @@ canvas.addEventListener('pointerdown', (e: PointerEvent) => {
 
   lastX = e.clientX;
   lastY = e.clientY;
+  // Arm a long-press: if the finger holds still, flip read ↔ edit on this board.
+  lpStartX = e.clientX;
+  lpStartY = e.clientY;
+  cancelLongPress();
+  lpTimer = window.setTimeout(() => {
+    lpTimer = null;
+    drag = null;
+    panning = false;
+    setMode(mode === 'arrange' ? 'navigate' : 'arrange');
+  }, LONG_PRESS_MS);
   if (mode === 'arrange' && frozenFocus) {
     const pwx = toWorldX(e.clientX - rect.left);
     const pwy = toWorldY(e.clientY - rect.top);
@@ -539,6 +568,9 @@ canvas.addEventListener('pointermove', (e: PointerEvent) => {
   if (tracked) {
     tracked.x = e.clientX;
     tracked.y = e.clientY;
+  }
+  if (lpTimer !== null && Math.hypot(e.clientX - lpStartX, e.clientY - lpStartY) > LP_MOVE_TOL) {
+    cancelLongPress(); // moved → it's a drag / pan, not a long-press
   }
 
   if (pointers.size === 2) {
@@ -582,6 +614,7 @@ canvas.addEventListener('pointermove', (e: PointerEvent) => {
 function endPointer(e: PointerEvent): void {
   pointers.delete(e.pointerId);
   if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  cancelLongPress();
 
   if (pointers.size === 1) {
     // pinch → one finger left: resume panning from it, no jump
