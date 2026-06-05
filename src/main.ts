@@ -328,6 +328,7 @@ themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 const cam = { x: 0, y: 0, zoom: 0.5 };
 const MIN_ZOOM = 0.01;
 const MAX_ZOOM = 1500;
+const FRAME = 0.82; // fraction of the viewport a framed board fills (lower = more padding around it)
 
 let viewW = 0;
 let viewH = 0;
@@ -343,7 +344,7 @@ function resize(): void {
   canvas.width = Math.round(viewW * dpr);
   canvas.height = Math.round(viewH * dpr);
   if (!framed && viewW > 0) {
-    cam.zoom = Math.min(viewW / ROOT.w, viewH / ROOT.h) * 0.92;
+    cam.zoom = Math.min(viewW / ROOT.w, viewH / ROOT.h) * FRAME;
     framed = true;
   }
 }
@@ -359,18 +360,18 @@ const BOARD_MIN = 128; // a card shows its inner board once it's this wide on sc
 const FOCUS_FILL = 0.6; // a child must fill this fraction of the viewport width to take focus
 
 const interior = (r: Rect): Rect => ({
-  x: r.x + r.w * 0.05,
-  y: r.y + r.h * 0.17,
-  w: r.w * 0.9,
-  h: r.h * 0.78,
+  x: r.x + r.w * 0.06,
+  y: r.y + r.h * 0.18,
+  w: r.w * 0.88,
+  h: r.h * 0.74,
 });
 
 function columns(b: Rect): Column[] {
-  const gap = b.w * 0.04;
+  const gap = b.w * 0.055;
   const colW = (b.w - gap * 2) / 3;
-  const headerH = b.h * 0.08;
-  const padTop = b.h * 0.025;
-  const padBottom = b.h * 0.025;
+  const headerH = b.h * 0.085;
+  const padTop = b.h * 0.045;
+  const padBottom = b.h * 0.045;
   return COLUMNS.map((status, c) => {
     const colX = b.x + c * (colW + gap);
     return {
@@ -380,9 +381,9 @@ function columns(b: Rect): Column[] {
       top: b.y,
       height: b.h,
       headerH,
-      innerX: colX + colW * 0.1,
+      innerX: colX + colW * 0.12,
       innerY: b.y + headerH + padTop,
-      innerW: colW * 0.8,
+      innerW: colW * 0.76,
       innerH: b.h - headerH - padTop - padBottom,
     };
   });
@@ -390,8 +391,8 @@ function columns(b: Rect): Column[] {
 
 function stack(kids: Node[], col: Column): Placed[] {
   if (kids.length === 0) return [];
-  const cgap = col.innerH * 0.05;
-  const idealH = col.innerW * 0.58;
+  const cgap = col.innerH * 0.08;
+  const idealH = col.innerW * 0.54;
   const fitH = (col.innerH - cgap * (kids.length - 1)) / kids.length;
   const h = Math.max(0, Math.min(idealH, fitH));
   return kids.map((node, i) => ({ node, x: col.innerX, y: col.innerY + i * (h + cgap), w: col.innerW, h }));
@@ -451,12 +452,15 @@ let pinchMidY = 0;
 
 // Snap-on-settle: zoom stays smooth, then eases to frame the nearest level at rest.
 const SETTLE_MS = 150; // quiet time after the last wheel event before we snap
-const SNAP_MS = 300; // snap animation length
+const SNAP_MS = 300; // settle-snap after a wheel gesture — quick & subtle
+const FLY_MS = 650; // deliberate fly-to (double-click / tree click) — longer & ease-in-out
 let lastWheelAt = -1;
 let wheelWX = 0;
 let wheelWY = 0;
 let pendingSnap = false;
-let snap: { fx: number; fy: number; fz: number; tx: number; ty: number; tz: number; start: number } | null = null;
+let snap:
+  | { fx: number; fy: number; fz: number; tx: number; ty: number; tz: number; start: number; dur: number; io: boolean }
+  | null = null;
 
 function setMode(m: Mode): void {
   mode = m;
@@ -477,7 +481,7 @@ function setMode(m: Mode): void {
   hint.textContent =
     m === 'arrange'
       ? 'drag cards between columns · drag the background to pan · Tab or Esc to exit'
-      : 'drag to pan · scroll/pinch zoom · double-click to rename · Tab to arrange';
+      : 'double-click a card to zoom to it · drag to pan · scroll / pinch zoom · Tab to arrange';
 }
 
 // --- Pan / drag input -------------------------------------------------------
@@ -883,7 +887,11 @@ canvas.addEventListener('dblclick', (e) => {
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const target = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-  if (target) openRename(target);
+  if (!target) return;
+  // Double-click brings a card into view. Double-click the card you're already
+  // focused on → rename it instead (you're already there).
+  if (target.node === panelFocusNode) openRename(target);
+  else flyTo(target);
 });
 
 addCardBtn.addEventListener('click', () => {
@@ -904,7 +912,7 @@ addCardBtn.addEventListener('click', () => {
 // --- Navigate: ease the camera to frame any node ----------------------------
 function flyTo(r: Rect): void {
   if (mode === 'arrange') setMode('navigate');
-  const fz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(viewW / r.w, viewH / r.h) * 0.9));
+  const fz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(viewW / r.w, viewH / r.h) * FRAME));
   snap = {
     fx: cam.x,
     fy: cam.y,
@@ -913,6 +921,8 @@ function flyTo(r: Rect): void {
     ty: r.y + r.h / 2,
     tz: fz,
     start: performance.now(),
+    dur: FLY_MS,
+    io: true, // deliberate move → longer, ease-in-out (pronounced)
   };
   pendingSnap = false;
 }
@@ -1314,7 +1324,7 @@ function startSnap(now: number): void {
   let targetZoom = cam.zoom;
   let bestDist = Infinity;
   for (const c of path) {
-    const fz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(viewW / c.w, viewH / c.h) * 0.9));
+    const fz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(viewW / c.w, viewH / c.h) * FRAME));
     const d = Math.abs(Math.log(fz) - zln);
     if (d < bestDist) {
       bestDist = d;
@@ -1331,6 +1341,8 @@ function startSnap(now: number): void {
     ty: target.y + target.h / 2,
     tz: targetZoom,
     start: now,
+    dur: SNAP_MS,
+    io: false, // quick settle → ease-out
   };
 }
 
@@ -1347,14 +1359,18 @@ function frame(now: number): void {
   effCache.clear();
 
   if (snap) {
-    const t = (now - snap.start) / SNAP_MS;
+    const t = (now - snap.start) / snap.dur;
     if (t >= 1) {
       cam.x = snap.tx;
       cam.y = snap.ty;
       cam.zoom = snap.tz;
       snap = null;
     } else {
-      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const ease = snap.io
+        ? t < 0.5
+          ? 4 * t * t * t
+          : 1 - Math.pow(-2 * t + 2, 3) / 2 // ease-in-out cubic (pronounced fly-to)
+        : 1 - Math.pow(1 - t, 3); // ease-out cubic (quick settle)
       cam.x = snap.fx + (snap.tx - snap.fx) * ease;
       cam.y = snap.fy + (snap.ty - snap.fy) * ease;
       cam.zoom = snap.fz * Math.pow(snap.tz / snap.fz, ease); // geometric, so it feels even
