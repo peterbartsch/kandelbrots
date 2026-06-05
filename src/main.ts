@@ -1116,16 +1116,26 @@ function drawGrid(): void {
 
 // A glowing wireframe card: translucent fill so the Grid shows through, a neon
 // cyan border, and a bright status-coloured edge.
-function cardShell(sx: number, sy: number, sw: number, sh: number, status: Status): void {
+function cardShell(sx: number, sy: number, sw: number, sh: number): void {
   const radius = Math.min(10, sw * 0.06);
   ctx.beginPath();
   ctx.roundRect(sx, sy, sw, sh, radius);
-  ctx.fillStyle = theme.cardFill;
-  ctx.fill();
+  // A soft drop shadow gives the card depth — that's the hierarchy cue now
+  // (it replaces the old circuit traces). Skipped on tiny cards to save the
+  // shadow-blur cost where it wouldn't read anyway.
+  if (sw > 48) {
+    ctx.save();
+    ctx.shadowColor = theme.dark ? 'rgba(0,0,0,0.55)' : 'rgba(40,48,68,0.22)';
+    ctx.shadowBlur = Math.min(24, sw * 0.09);
+    ctx.shadowOffsetY = Math.min(8, sw * 0.03);
+    ctx.fillStyle = theme.cardFill;
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = theme.cardFill;
+    ctx.fill();
+  }
   glow(theme.line, 0.5, sw < 90 ? 0.7 : 1);
-  // status stripe, inset within the rounded corners so it needs no clip
-  ctx.fillStyle = statusColor(status);
-  ctx.fillRect(sx + 1, sy + radius, Math.max(2, Math.min(sw * 0.02, 7)), sh - radius * 2);
 }
 
 function cardTitle(sx: number, sy: number, sw: number, sh: number, title: string): void {
@@ -1173,14 +1183,13 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
     return;
   }
 
-  cardShell(sx, sy, sw, sh, eff);
+  cardShell(sx, sy, sw, sh);
   if (sw < 34) return;
   cardTitle(sx, sy, sw, sh, node.title);
 
   if (sw >= BOARD_MIN && node.children.length > 0) {
     const b = interior({ x, y, w, h });
     drawBoard(node, b);
-    drawTraces(node, b);
   }
 }
 
@@ -1207,61 +1216,6 @@ function drawBoard(node: Node, b: Rect): void {
       drawNode(p.node, p.x, p.y, p.w, p.h);
     }
   }
-}
-
-// Circuit-board traces: each column's cards tapped off a glowing bus rail with
-// solder-node dots — the kanban board read as a literal circuit board. Only the
-// prominent boards get wired, to keep it sparse and cheap.
-function drawTraces(node: Node, b: Rect): void {
-  if (b.w * cam.zoom < 280) return;
-  const nodes: [number, number][] = [];
-  const rails: { x: number; top: number; bottom: number }[] = [];
-  ctx.beginPath();
-  for (const col of columns(b)) {
-    const placed = stack(
-      node.children.filter((k) => effectiveStatus(k) === col.status),
-      col,
-    );
-    if (placed.length === 0) continue;
-    const railSX = toScreenX(col.colX + col.colW * 0.045);
-    const top = toScreenY(col.innerY);
-    const last = placed[placed.length - 1];
-    const bottom = toScreenY(last.y + last.h / 2);
-    rails.push({ x: railSX, top, bottom });
-    ctx.moveTo(railSX, top);
-    ctx.lineTo(railSX, bottom);
-    for (const p of placed) {
-      const cy = toScreenY(p.y + p.h / 2);
-      ctx.moveTo(railSX, cy);
-      ctx.lineTo(toScreenX(p.x), cy);
-      nodes.push([toScreenX(p.x), cy]);
-    }
-  }
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = rgba(theme.line, 0.06);
-  ctx.stroke();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = rgba(theme.line, 0.3);
-  ctx.stroke();
-  ctx.fillStyle = rgba(theme.lineCore, 0.85);
-  for (const [nx, ny] of nodes) {
-    ctx.beginPath();
-    ctx.arc(nx, ny, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // energy pulses travelling down each rail — the circuit reading as "live"
-  rails.forEach((r, i) => {
-    const t = (nowMs / 2200 + i * 0.21) % 1;
-    const py = r.top + t * (r.bottom - r.top);
-    ctx.fillStyle = rgba(theme.line, 0.16);
-    ctx.beginPath();
-    ctx.arc(r.x, py, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = rgba(theme.lineCore, 0.95);
-    ctx.beginPath();
-    ctx.arc(r.x, py, 2.4, 0, Math.PI * 2);
-    ctx.fill();
-  });
 }
 
 // Dim everything outside the focused board (Arrange mode).
@@ -1334,7 +1288,7 @@ function drawLifted(): void {
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 18;
   ctx.shadowOffsetY = 6;
-  cardShell(sx, sy, sw, sh, drag.node.status);
+  cardShell(sx, sy, sw, sh);
   ctx.shadowColor = 'transparent';
   cardTitle(sx, sy, sw, sh, drag.node.title);
   ctx.restore();
@@ -1385,7 +1339,6 @@ let lastFrame = performance.now();
 let fps = 60;
 let drawn = 0;
 let pulse = 1;
-let nowMs = 0;
 
 function frame(now: number): void {
   const dt = now - lastFrame;
@@ -1412,7 +1365,6 @@ function frame(now: number): void {
   }
 
   pulse = 0.82 + 0.18 * Math.sin(now / 460);
-  nowMs = now;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, viewW, viewH);
