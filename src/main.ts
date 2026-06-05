@@ -273,13 +273,19 @@ const ctx = canvas.getContext('2d')!;
 const hud = document.getElementById('hud')!;
 const btn = document.getElementById('mode-toggle') as HTMLButtonElement;
 const treeEl = document.getElementById('tree')!;
+const piPath = document.getElementById('pi-path')!;
 const piTitle = document.getElementById('pi-title')!;
 const piStatus = document.getElementById('pi-status')!;
+const piPct = document.getElementById('pi-pct')!;
+const piBar = document.getElementById('pi-bar')!;
 const segTodo = document.querySelector('#pi-bar .seg.todo') as HTMLElement;
 const segDoing = document.querySelector('#pi-bar .seg.doing') as HTMLElement;
 const segDone = document.querySelector('#pi-bar .seg.done') as HTMLElement;
+const piLegend = document.getElementById('pi-legend')!;
 const piMeta = document.getElementById('pi-meta')!;
 const piPin = document.getElementById('pi-pin') as HTMLButtonElement;
+const tasksLabel = document.getElementById('tasks-label')!;
+const taskListEl = document.getElementById('task-list')!;
 const hint = document.getElementById('hint')!;
 const openDirBtn = document.getElementById('open-dir-btn') as HTMLButtonElement;
 const importBtn = document.getElementById('import-btn') as HTMLButtonElement;
@@ -337,7 +343,7 @@ themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 
 const cam = { x: 0, y: 0, zoom: 0.5 };
 const MIN_ZOOM = 0.01;
-const MAX_ZOOM = 1500;
+const MAX_ZOOM = 20000; // deep enough that a 6–7-level leaf can fill the viewport and take focus
 const FRAME = 0.82; // fraction of the viewport a framed board fills (lower = more padding around it)
 
 let viewW = 0;
@@ -973,6 +979,32 @@ function descendants(n: Node): number {
   for (const k of n.children) c += descendants(k);
   return c;
 }
+
+// Leaf roll-up: count the atomic tasks (childless or pinned units) under a node
+// by effective status. This is the "real progress" of a whole branch — what the
+// header bar + % complete report.
+interface LeafStats {
+  todo: number;
+  doing: number;
+  done: number;
+  total: number;
+}
+function leafStats(n: Node): LeafStats {
+  if (n.children.length === 0 || n.pinned) {
+    const s = effectiveStatus(n);
+    return { todo: +(s === 'todo'), doing: +(s === 'doing'), done: +(s === 'done'), total: 1 };
+  }
+  const acc: LeafStats = { todo: 0, doing: 0, done: 0, total: 0 };
+  for (const k of n.children) {
+    const cs = leafStats(k);
+    acc.todo += cs.todo;
+    acc.doing += cs.doing;
+    acc.done += cs.done;
+    acc.total += cs.total;
+  }
+  return acc;
+}
+
 let panelSig = '';
 let panelFocusNode: Node | null = null;
 
@@ -1059,35 +1091,117 @@ function buildTree(): void {
   treeEl.querySelector('.tree-row.current')?.scrollIntoView({ block: 'nearest' }); // keep focus visible
 }
 
+// Breadcrumb: the ancestry from root → focus, each a click-to-fly crumb. It
+// grows as you descend, so depth reads directly from "where you are".
+function buildPath(path: Focus[]): void {
+  piPath.replaceChildren();
+  path.forEach((p, i) => {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'pi-crumb-sep';
+      sep.textContent = '›';
+      piPath.append(sep);
+    }
+    const last = i === path.length - 1;
+    const crumb = document.createElement(last ? 'span' : 'button');
+    crumb.className = last ? 'pi-crumb current' : 'pi-crumb';
+    crumb.textContent = p.node.title;
+    if (!last) {
+      crumb.addEventListener('click', () => {
+        const r = findRect(p.node);
+        if (r) flyTo(r);
+      });
+    }
+    piPath.append(crumb);
+  });
+}
+
+// The Tasks section: the focus's direct children, each with its own status +
+// progress, click to drill in. At a leaf (the deepest task) it becomes an
+// actionable status setter instead — the most detail at the most specific level.
+function buildTasks(f: Node): void {
+  taskListEl.replaceChildren();
+  if (f.children.length === 0) {
+    tasksLabel.textContent = 'Set status';
+    const row = document.createElement('div');
+    row.className = 'leaf-actions';
+    const cur = effectiveStatus(f);
+    for (const s of COLUMNS) {
+      const b = document.createElement('button');
+      b.className = `leaf-btn ${s}` + (cur === s ? ' active' : '');
+      b.textContent = COLUMN_LABEL[s];
+      b.addEventListener('click', () => {
+        f.status = s;
+        persist();
+        refreshPanel();
+        const r = findRect(f); // follow the card to its new column
+        if (r) flyTo(r);
+      });
+      row.append(b);
+    }
+    taskListEl.append(row);
+    return;
+  }
+  tasksLabel.textContent = `Tasks · ${f.children.length}`;
+  const kids = [...f.children].sort(
+    (a, b) => STATUS_RANK[effectiveStatus(a)] - STATUS_RANK[effectiveStatus(b)],
+  );
+  for (const c of kids) {
+    const row = document.createElement('button');
+    row.className = 'task-item';
+    const dot = document.createElement('span');
+    dot.className = `task-dot ${effectiveStatus(c)}`;
+    const label = document.createElement('span');
+    label.className = 'task-label';
+    label.textContent = c.title;
+    const prog = document.createElement('span');
+    prog.className = 'task-prog';
+    if (c.children.length > 0) {
+      const st = leafStats(c);
+      prog.textContent = `${st.done}/${st.total}`;
+    }
+    row.append(dot, label, prog);
+    row.addEventListener('click', () => {
+      const r = findRect(c);
+      if (r) flyTo(r);
+    });
+    taskListEl.append(row);
+  }
+}
+
 function updatePanel(path: Focus[]): void {
   const f = path[path.length - 1].node;
   panelFocusNode = f;
-  let todo = 0;
-  let doing = 0;
-  let done = 0;
-  for (const k of f.children) {
-    const s = effectiveStatus(k);
-    if (s === 'todo') todo++;
-    else if (s === 'doing') doing++;
-    else done++;
-  }
   const eff = effectiveStatus(f);
   const total = f.children.length;
-  const desc = descendants(f);
-  const sig = `${f.title}|${eff}|${f.pinned ? 'P' : 'A'}|${todo},${doing},${done}|${desc}|${path.length}`;
+  const depth = path.length - 1;
+  const parent = depth > 0 ? path[depth - 1].node : null;
+  const ls = leafStats(f);
+  const pct = ls.total ? Math.round((ls.done / ls.total) * 100) : 0;
+  const childHash = f.children.map((c) => c.title + effectiveStatus(c) + c.children.length).join(',');
+  const sig = `${path.map((p) => p.node.title).join('>')}|${eff}|${f.pinned ? 'P' : 'A'}|${ls.todo},${ls.doing},${ls.done}|${total}|${childHash}`;
   if (sig !== panelSig) {
     panelSig = sig;
+    buildPath(path);
     piTitle.textContent = f.title;
     piStatus.textContent = eff;
     piStatus.className = `status-chip ${eff}`;
-    segTodo.style.flexGrow = String(todo);
-    segDoing.style.flexGrow = String(doing);
-    segDone.style.flexGrow = String(done);
-    piMeta.textContent =
-      total === 0
-        ? 'leaf · no children'
-        : `${total} cards · ${todo}/${doing}/${done} · ${desc} in subtree · depth ${path.length - 1}`;
-    if (total === 0) {
+
+    const hasKids = total > 0;
+    piBar.style.display = hasKids ? '' : 'none';
+    piPct.textContent = hasKids ? `${pct}% done` : '';
+    segTodo.style.flexGrow = String(ls.todo);
+    segDoing.style.flexGrow = String(ls.doing);
+    segDone.style.flexGrow = String(ls.done);
+    piLegend.textContent = hasKids
+      ? `${ls.todo} to-do · ${ls.doing} doing · ${ls.done} done`
+      : 'a single task · no breakdown';
+
+    const sib = parent ? ` · #${parent.children.indexOf(f) + 1} of ${parent.children.length}` : '';
+    const branch = hasKids ? ` · ${ls.total} tasks in branch` : '';
+    piMeta.textContent = `level ${depth}${sib}${branch}`;
+
+    if (!hasKids) {
       piPin.style.display = 'none';
     } else if (f.pinned) {
       piPin.style.display = '';
@@ -1098,6 +1212,7 @@ function updatePanel(path: Focus[]): void {
       piPin.className = 'pi-pin';
       piPin.textContent = '⟲ auto · status from children';
     }
+    buildTasks(f);
   }
 
   // Rebuild the tree on edits/expands immediately, and on a focus change only

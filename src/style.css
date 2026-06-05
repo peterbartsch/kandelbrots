@@ -49,8 +49,8 @@ body {
   width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 18px 16px;
+  gap: 14px;
+  padding: 16px 16px;
   background: var(--panel-bg);
   border-left: 1px solid rgb(var(--line) / 0.32);
   box-shadow:
@@ -145,6 +145,166 @@ body {
   color: var(--text-dim);
 }
 
+/* ---- Breadcrumb path (ancestry → focus) ---------------------------------- */
+#pi-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 5px;
+  font: 10px/1.3 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pi-crumb {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(var(--line) / 0.72);
+  transition: color 0.1s;
+}
+.pi-crumb:hover {
+  color: var(--text);
+}
+.pi-crumb.current {
+  color: var(--text-dim);
+  cursor: default;
+}
+.pi-crumb-sep {
+  color: rgb(var(--line) / 0.4);
+}
+
+/* ---- Status headline (chip + % complete) + legend ------------------------ */
+#pi-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#pi-pct {
+  font: 600 13px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+}
+#pi-legend {
+  font: 10px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- Tasks (the focus's direct children) --------------------------------- */
+#panel-tasks {
+  display: flex;
+  flex-direction: column;
+}
+#task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 30vh;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: rgb(var(--line) / 0.05);
+  border: 1px solid rgb(var(--line) / 0.14);
+  border-radius: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: 12px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--text);
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+.task-item:hover {
+  background: rgb(var(--line) / 0.12);
+  border-color: rgb(var(--line) / 0.4);
+}
+.task-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #5a6b7a;
+}
+.task-dot.todo {
+  background: rgb(var(--todo));
+  box-shadow: 0 0 8px rgb(var(--todo) / calc(1 * var(--glow)));
+}
+.task-dot.doing {
+  background: rgb(var(--doing));
+  box-shadow: 0 0 8px rgb(var(--doing) / calc(1 * var(--glow)));
+}
+.task-dot.done {
+  background: rgb(var(--done));
+  box-shadow: 0 0 8px rgb(var(--done) / calc(1 * var(--glow)));
+}
+.task-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-prog {
+  flex: 0 0 auto;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+/* ---- Leaf status setter (the deepest, most actionable detail) ------------- */
+.leaf-actions {
+  display: flex;
+  gap: 6px;
+}
+.leaf-btn {
+  flex: 1;
+  background: rgb(var(--line) / 0.05);
+  border: 1px solid rgb(var(--line) / 0.2);
+  border-radius: 4px;
+  padding: 10px 4px;
+  cursor: pointer;
+  font: 10px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  transition: all 0.1s;
+}
+.leaf-btn:hover {
+  color: var(--text);
+  border-color: rgb(var(--line) / 0.5);
+}
+.leaf-btn.todo.active {
+  color: var(--text);
+  border-color: rgb(var(--todo));
+  background: rgb(var(--todo) / 0.16);
+  box-shadow: 0 0 12px rgb(var(--todo) / calc(0.3 * var(--glow)));
+}
+.leaf-btn.doing.active {
+  color: var(--text);
+  border-color: rgb(var(--doing));
+  background: rgb(var(--doing) / 0.16);
+  box-shadow: 0 0 12px rgb(var(--doing) / calc(0.3 * var(--glow)));
+}
+.leaf-btn.done.active {
+  color: var(--text);
+  border-color: rgb(var(--done));
+  background: rgb(var(--done) / 0.16);
+  box-shadow: 0 0 12px rgb(var(--done) / calc(0.3 * var(--glow)));
+}
+
 /* derived vs pinned indicator (pinned runs on the accent, the override colour) */
 .pi-pin {
   align-self: flex-start;
@@ -227,11 +387,11 @@ body {
 #tree-wrap {
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-height: 0;
 }
 
 #tree {
+  max-height: 34vh;
   overflow-y: auto;
   margin: 0 -16px;
   padding: 0 16px;

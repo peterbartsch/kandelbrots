@@ -11,23 +11,35 @@
   <body>
     <canvas id="stage"></canvas>
     <aside id="panel">
+      <nav id="pi-path" aria-label="Path"></nav>
+
       <div id="panel-info">
-        <div class="pi-label">Focus</div>
         <div id="pi-title"></div>
-        <div id="pi-status" class="status-chip"></div>
+        <div id="pi-headline">
+          <span id="pi-status" class="status-chip"></span>
+          <span id="pi-pct"></span>
+        </div>
         <div id="pi-bar">
           <span class="seg todo"></span>
           <span class="seg doing"></span>
           <span class="seg done"></span>
         </div>
+        <div id="pi-legend"></div>
         <div id="pi-meta"></div>
         <button id="pi-pin" type="button"></button>
-        <button id="add-card" type="button">+ Add card</button>
       </div>
+
+      <div id="panel-tasks">
+        <div class="pi-label" id="tasks-label">Tasks</div>
+        <div id="task-list"></div>
+        <button id="add-card" type="button">+ Add task</button>
+      </div>
+
       <div id="tree-wrap">
-        <div class="pi-label">Board</div>
+        <div class="pi-label">Full board</div>
         <div id="tree"></div>
       </div>
+
       <div id="theme-wrap">
         <div class="pi-label">Theme</div>
         <select id="theme-select" aria-label="Theme"></select>
