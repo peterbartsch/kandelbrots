@@ -45,100 +45,32 @@ interface Theme {
   done: RGB;
 }
 
+// Two modes — a clean Light and a clean Dark, both flat (no neon glow).
+// Light (default) is Solarized Light; Dark is colour-matched to the Atlasphere
+// "living map" UI: cool near-black canvas, darker rails, blue-grey chrome, and
+// functional status accents (steel blue / amber / teal-green; rose for accent).
 const THEMES: Record<string, Theme> = {
-  tron: {
-    label: 'Tron', dark: true, glow: 1, scanlines: true,
-    bg: 'radial-gradient(ellipse at 60% 38%, #0a1622 0%, #04070e 58%, #01030a 100%)',
-    panelBg: 'linear-gradient(180deg, rgba(6,14,24,0.82), rgba(3,8,16,0.82))',
-    cardFill: 'rgba(8,18,30,0.55)', scrim: 'rgba(2,6,13,0.72)',
-    text: 'rgba(214,248,255,0.98)', textDim: 'rgba(120,200,230,0.62)',
-    line: [44, 224, 255], lineCore: [154, 246, 255], grid: [44, 224, 255], gridA: 1,
-    accent: [255, 174, 52], accentCore: [255, 221, 150],
-    todo: [58, 150, 255], doing: [255, 174, 52], done: [47, 240, 200],
-  },
-  midnight: {
-    label: 'Midnight', dark: true, glow: 0.4, scanlines: false,
-    bg: 'radial-gradient(ellipse at 50% 30%, #1b1f27 0%, #15171d 60%, #0e1014 100%)',
-    panelBg: 'linear-gradient(180deg, #181b22, #121419)',
-    cardFill: 'rgba(30,34,42,0.6)', scrim: 'rgba(8,9,12,0.72)',
-    text: '#e6e9ef', textDim: 'rgba(160,170,185,0.7)',
-    line: [120, 170, 210], lineCore: [205, 222, 240], grid: [120, 140, 170], gridA: 0.8,
-    accent: [240, 185, 95], accentCore: [255, 212, 150],
-    todo: [90, 160, 250], doing: [240, 190, 90], done: [90, 205, 145],
-  },
-  paper: {
-    label: 'Paper (light)', dark: false, glow: 0, scanlines: false,
-    bg: 'radial-gradient(ellipse at 50% 30%, #fbfaf6 0%, #efece3 100%)',
-    panelBg: '#eceae2', cardFill: 'rgba(255,255,255,0.72)', scrim: 'rgba(244,241,234,0.7)',
-    text: '#2a2c33', textDim: 'rgba(90,95,110,0.85)',
-    line: [95, 105, 125], lineCore: [55, 62, 80], grid: [120, 125, 140], gridA: 1.4,
-    accent: [205, 115, 35], accentCore: [165, 80, 15],
-    todo: [40, 110, 210], doing: [200, 130, 20], done: [40, 150, 90],
-  },
-  'solarized-dark': {
-    label: 'Solarized Dark', dark: true, glow: 0.35, scanlines: false,
-    bg: '#002b36', panelBg: '#073642', cardFill: 'rgba(7,54,66,0.55)', scrim: 'rgba(0,20,26,0.72)',
-    text: '#93a1a1', textDim: 'rgba(131,148,150,0.72)',
-    line: [38, 139, 210], lineCore: [147, 161, 161], grid: [88, 110, 117], gridA: 0.7,
-    accent: [203, 75, 22], accentCore: [223, 110, 60],
-    todo: [38, 139, 210], doing: [181, 137, 0], done: [133, 153, 0],
-  },
   'solarized-light': {
-    label: 'Solarized Light', dark: false, glow: 0, scanlines: false,
+    label: 'Light', dark: false, glow: 0, scanlines: false,
     bg: '#fdf6e3', panelBg: '#eee8d5', cardFill: 'rgba(255,252,242,0.72)', scrim: 'rgba(253,246,227,0.7)',
     text: '#586e75', textDim: 'rgba(101,123,131,0.85)',
     line: [38, 139, 210], lineCore: [88, 110, 117], grid: [147, 161, 161], gridA: 1.2,
     accent: [203, 75, 22], accentCore: [170, 55, 12],
     todo: [38, 139, 210], doing: [181, 137, 0], done: [133, 153, 0],
   },
-  dracula: {
-    label: 'Dracula', dark: true, glow: 0.55, scanlines: false,
-    bg: 'radial-gradient(ellipse at 50% 30%, #2d2f3d 0%, #21222c 100%)',
-    panelBg: '#21222c', cardFill: 'rgba(68,71,90,0.5)', scrim: 'rgba(20,21,28,0.72)',
-    text: '#f8f8f2', textDim: 'rgba(98,114,164,0.9)',
-    line: [189, 147, 249], lineCore: [248, 248, 242], grid: [98, 114, 164], gridA: 0.6,
-    accent: [255, 121, 198], accentCore: [255, 184, 222],
-    todo: [139, 233, 253], doing: [255, 184, 108], done: [80, 250, 123],
-  },
-  nord: {
-    label: 'Nord', dark: true, glow: 0.4, scanlines: false,
-    bg: '#2e3440', panelBg: '#2b303b', cardFill: 'rgba(59,66,82,0.5)', scrim: 'rgba(20,24,31,0.7)',
-    text: '#eceff4', textDim: 'rgba(143,158,178,0.82)',
-    line: [136, 192, 208], lineCore: [236, 239, 244], grid: [76, 86, 106], gridA: 0.8,
-    accent: [180, 142, 173], accentCore: [212, 182, 206],
-    todo: [129, 161, 193], doing: [235, 203, 139], done: [163, 190, 140],
-  },
-  gruvbox: {
-    label: 'Gruvbox', dark: true, glow: 0.4, scanlines: false,
-    bg: '#282828', panelBg: '#32302f', cardFill: 'rgba(60,56,54,0.55)', scrim: 'rgba(20,20,20,0.72)',
-    text: '#ebdbb2', textDim: 'rgba(168,153,132,0.85)',
-    line: [142, 192, 124], lineCore: [235, 219, 178], grid: [146, 131, 116], gridA: 0.7,
-    accent: [254, 128, 25], accentCore: [255, 170, 90],
-    todo: [131, 165, 152], doing: [250, 189, 47], done: [184, 187, 38],
-  },
-  phosphor: {
-    label: 'Green Phosphor', dark: true, glow: 1, scanlines: true,
-    bg: 'radial-gradient(ellipse at 50% 40%, #031a08 0%, #010d04 60%, #000600 100%)',
-    panelBg: 'linear-gradient(180deg, rgba(4,22,10,0.85), rgba(1,10,4,0.85))',
-    cardFill: 'rgba(6,26,12,0.55)', scrim: 'rgba(0,8,3,0.72)',
-    text: 'rgba(180,255,190,0.96)', textDim: 'rgba(80,200,110,0.6)',
-    line: [51, 255, 102], lineCore: [190, 255, 200], grid: [51, 255, 102], gridA: 0.9,
-    accent: [120, 255, 140], accentCore: [205, 255, 215],
-    todo: [40, 200, 90], doing: [120, 255, 140], done: [220, 255, 200],
-  },
-  amber: {
-    label: 'Amber CRT', dark: true, glow: 1, scanlines: true,
-    bg: 'radial-gradient(ellipse at 50% 40%, #1a0f00 0%, #0d0700 60%, #060300 100%)',
-    panelBg: 'linear-gradient(180deg, rgba(22,13,2,0.85), rgba(10,6,1,0.85))',
-    cardFill: 'rgba(26,16,4,0.55)', scrim: 'rgba(8,4,0,0.72)',
-    text: 'rgba(255,210,140,0.96)', textDim: 'rgba(220,150,40,0.6)',
-    line: [255, 176, 0], lineCore: [255, 224, 160], grid: [255, 176, 0], gridA: 0.9,
-    accent: [255, 120, 40], accentCore: [255, 184, 120],
-    todo: [200, 120, 0], doing: [255, 176, 0], done: [255, 224, 160],
+  atlas: {
+    label: 'Dark', dark: true, glow: 0, scanlines: false,
+    bg: 'radial-gradient(ellipse at 50% 28%, #191b1f 0%, #15161a 70%, #111216 100%)',
+    panelBg: '#101114',
+    cardFill: 'rgba(36,40,48,0.7)', scrim: 'rgba(8,9,11,0.74)',
+    text: '#d4d8df', textDim: 'rgba(140,149,162,0.72)',
+    line: [98, 114, 138], lineCore: [188, 200, 218], grid: [74, 88, 108], gridA: 0.8,
+    accent: [202, 102, 118], accentCore: [230, 150, 166],
+    todo: [74, 143, 216], doing: [226, 156, 66], done: [80, 180, 135],
   },
 };
 
-let theme: Theme = THEMES.tron;
+let theme: Theme = THEMES['solarized-light'];
 const statusColor = (s: Status): string => rgb(theme[s]);
 
 interface Node {
@@ -316,7 +248,7 @@ treeSearch.addEventListener('keydown', (e) => {
 // --- Theme application ------------------------------------------------------
 const THEME_KEY = 'kandelbrot.theme.v2'; // v2: forget the old default that used to auto-persist on first load
 function applyTheme(key: string, persist = true): void {
-  const t = THEMES[key] ?? THEMES.tron;
+  const t = THEMES[key] ?? THEMES['solarized-light'];
   theme = t;
   const s = document.documentElement.style;
   s.setProperty('--bg', t.bg);
