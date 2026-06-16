@@ -14,6 +14,9 @@
   --doing: 255 174 52;
   --done: 47 240 200;
   --glow: 1;
+  /* three-pane layout: nav rail (left) · canvas (center) · inspector (right) */
+  --nav-w: 280px;
+  --panel-w: 320px;
 }
 
 * {
@@ -32,12 +35,82 @@ body {
 #stage {
   position: fixed;
   top: 0;
-  left: 0; /* boards on the left; panel on the right */
-  width: calc(100vw - 320px);
+  left: var(--nav-w); /* nav rail (left) · canvas (center) · inspector (right) */
+  width: calc(100vw - var(--nav-w) - var(--panel-w));
   height: 100vh;
   display: block;
   cursor: grab;
   touch-action: none; /* stop the browser hijacking drag / pinch gestures */
+}
+
+/* ---- Left rail: navigation (search + the board hierarchy) ---------------- */
+#nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--nav-w);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+  background: var(--panel-bg);
+  border-right: 1px solid rgb(var(--line) / 0.32);
+  box-shadow:
+    inset -1px 0 16px rgb(var(--line) / calc(0.05 * var(--glow))),
+    3px 0 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  user-select: none;
+}
+
+#nav-head {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.brand {
+  font: 700 13px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text);
+  text-shadow: 0 0 12px rgb(var(--line) / calc(0.4 * var(--glow)));
+}
+
+#tree-search {
+  width: 100%;
+  font: 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  background: rgb(var(--line) / 0.06);
+  border: 1px solid rgb(var(--line) / 0.28);
+  border-radius: 4px;
+  padding: 8px 10px;
+  outline: none;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+#tree-search::placeholder {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+#tree-search:focus {
+  border-color: rgb(var(--line) / 0.6);
+  background: rgb(var(--line) / 0.1);
+}
+
+#nav-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(var(--line) / 0.12);
 }
 
 /* ---- Inspector panel ------------------------------------------------------ */
@@ -46,7 +119,7 @@ body {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 320px;
+  width: var(--panel-w);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -387,14 +460,15 @@ body {
 #tree-wrap {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
 }
 
 #tree {
-  max-height: 34vh;
+  flex: 1;
   overflow-y: auto;
-  margin: 0 -16px;
-  padding: 0 16px;
+  margin: 0 -14px;
+  padding: 0 14px;
 }
 
 .tree-row {
@@ -532,7 +606,7 @@ body {
 }
 
 #hint {
-  left: 16px;
+  left: calc(var(--nav-w) + 16px);
   bottom: 14px;
   color: var(--text-dim);
   text-shadow: none;
@@ -541,9 +615,19 @@ body {
 #toolbar {
   position: fixed;
   top: 12px;
-  left: 16px;
+  left: calc(var(--nav-w) + 16px);
   display: flex;
   gap: 8px;
+}
+
+/* On narrow screens (tablet/phone) drop the left rail; canvas + inspector remain. */
+@media (max-width: 900px) {
+  :root {
+    --nav-w: 0px;
+  }
+  #nav {
+    display: none;
+  }
 }
 
 #toolbar button {

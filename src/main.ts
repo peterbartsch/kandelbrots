@@ -295,6 +295,23 @@ const renameInput = document.getElementById('rename-input') as HTMLInputElement;
 const addCardBtn = document.getElementById('add-card') as HTMLButtonElement;
 const scanlinesEl = document.getElementById('scanlines')!;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+const treeSearch = document.getElementById('tree-search') as HTMLInputElement;
+
+// Left-rail search: filter the board tree as you type. stopPropagation keeps the
+// global Tab/Esc shortcuts from firing while typing; Esc clears the search.
+treeSearch.addEventListener('input', () => {
+  treeQuery = treeSearch.value.trim().toLowerCase();
+  refreshPanel();
+});
+treeSearch.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Escape') {
+    treeSearch.value = '';
+    treeQuery = '';
+    refreshPanel();
+    treeSearch.blur();
+  }
+});
 
 // --- Theme application ------------------------------------------------------
 const THEME_KEY = 'kandelbrot.theme.v2'; // v2: forget the old default that used to auto-persist on first load
@@ -349,19 +366,22 @@ const FRAME = 0.82; // fraction of the viewport a framed board fills (lower = mo
 let viewW = 0;
 let viewH = 0;
 let dpr = 1;
-let framed = false;
+let userMoved = false; // true once the user pans/zooms/flies — until then we keep auto-fitting
 
 const ROOT: Rect = { x: -1200, y: -750, w: 2400, h: 1500 };
 
+// Fit the root board to the viewport. Re-runs on resize (window/rotation/rail
+// changes) until the user takes the camera somewhere themselves.
 function resize(): void {
   dpr = window.devicePixelRatio || 1;
   viewW = canvas.clientWidth;
   viewH = canvas.clientHeight;
   canvas.width = Math.round(viewW * dpr);
   canvas.height = Math.round(viewH * dpr);
-  if (!framed && viewW > 0) {
+  if (!userMoved && viewW > 0) {
     cam.zoom = Math.min(viewW / ROOT.w, viewH / ROOT.h) * FRAME;
-    framed = true;
+    cam.x = ROOT.x + ROOT.w / 2;
+    cam.y = ROOT.y + ROOT.h / 2;
   }
 }
 window.addEventListener('resize', resize);
@@ -596,6 +616,7 @@ canvas.addEventListener('pointermove', (e: PointerEvent) => {
       wheelWY = wy;
       lastWheelAt = e.timeStamp;
       pendingSnap = true;
+      userMoved = true;
     }
     pinchDist = dist;
     pinchMidX = midX;
@@ -614,6 +635,7 @@ canvas.addEventListener('pointermove', (e: PointerEvent) => {
     cam.y -= (e.clientY - lastY) / cam.zoom;
     lastX = e.clientX;
     lastY = e.clientY;
+    userMoved = true;
   }
 });
 
@@ -717,6 +739,7 @@ canvas.addEventListener(
     cam.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.zoom * factor));
     cam.x = wx - (mx - viewW / 2) / cam.zoom;
     cam.y = wy - (my - viewH / 2) / cam.zoom;
+    userMoved = true;
     // remember where we were zooming so we can ease to that level once you stop
     wheelWX = wx;
     wheelWY = wy;
@@ -958,6 +981,7 @@ addCardBtn.addEventListener('click', () => {
 // --- Navigate: ease the camera to frame any node ----------------------------
 function flyTo(r: Rect): void {
   if (mode === 'arrange') setMode('navigate');
+  userMoved = true;
   const fz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(viewW / r.w, viewH / r.h) * FRAME));
   snap = {
     fx: cam.x,
@@ -1016,6 +1040,8 @@ const STATUS_RANK: Record<Status, number> = { todo: 0, doing: 1, done: 2 };
 let treeVersion = 0; // bumped on any structural / expand change
 let lastTreeFocus: Node | null = null;
 let lastTreeVersion = -1;
+let treeQuery = ''; // left-rail search filter (lowercased)
+let hoverNode: Node | null = null; // tree row under the cursor → highlighted on canvas
 
 function refreshPanel(): void {
   panelSig = '';
@@ -1027,19 +1053,27 @@ function buildTree(): void {
   const onPath = new Set<Node>();
   for (const p of focusPath()) onPath.add(p.node);
   const focus = panelFocusNode;
-  const isOpen = (n: Node): boolean => expanded.has(n) || onPath.has(n);
+  const q = treeQuery;
+  const matches = (n: Node): boolean => n.title.toLowerCase().includes(q);
+  const inSearch = (n: Node): boolean => matches(n) || n.children.some(inSearch);
+  // While searching, every matching branch is revealed; otherwise honour the
+  // manual/auto-expand state.
+  const isOpen = (n: Node): boolean => (q ? true : expanded.has(n) || onPath.has(n));
 
   const addRow = (n: Node, depth: number, parent: Node | null): void => {
     const open = isOpen(n);
     const hasKids = n.children.length > 0;
     const row = document.createElement('div');
-    row.className = n === focus ? 'tree-row current' : 'tree-row';
+    let cls = 'tree-row';
+    if (n === focus) cls += ' current';
+    if (q && matches(n)) cls += ' match';
+    row.className = cls;
     row.style.paddingLeft = `${6 + depth * 15}px`;
 
     const tog = document.createElement('span');
     tog.className = 'tree-tog';
     tog.textContent = hasKids ? (open ? '▾' : '▸') : '';
-    if (hasKids) {
+    if (hasKids && !q) {
       tog.addEventListener('click', (e) => {
         e.stopPropagation();
         if (expanded.has(n)) expanded.delete(n);
@@ -1071,6 +1105,13 @@ function buildTree(): void {
       row.append(del);
     }
 
+    // Hover a row → light up that card on the canvas (the tree↔canvas sync).
+    row.addEventListener('pointerenter', () => {
+      hoverNode = n;
+    });
+    row.addEventListener('pointerleave', () => {
+      if (hoverNode === n) hoverNode = null;
+    });
     row.addEventListener('click', () => {
       expanded.add(n);
       const r = findRect(n);
@@ -1080,15 +1121,19 @@ function buildTree(): void {
     treeEl.appendChild(row);
 
     if (open && hasKids) {
-      const kids = [...n.children].sort(
+      let kids = [...n.children].sort(
         (a, b) => STATUS_RANK[effectiveStatus(a)] - STATUS_RANK[effectiveStatus(b)],
       );
+      if (q) kids = kids.filter(inSearch); // when searching, prune non-matching branches
       for (const c of kids) addRow(c, depth + 1, n);
     }
   };
 
   addRow(root, 0, null);
-  treeEl.querySelector('.tree-row.current')?.scrollIntoView({ block: 'nearest' }); // keep focus visible
+  // keep the focused row (or the first search hit) in view
+  (treeEl.querySelector('.tree-row.match') ?? treeEl.querySelector('.tree-row.current'))?.scrollIntoView({
+    block: 'nearest',
+  });
 }
 
 // Breadcrumb: the ancestry from root → focus, each a click-to-fly crumb. It
@@ -1419,6 +1464,28 @@ function focusRing(f: Focus, strong: boolean): void {
   ctx.stroke();
 }
 
+// Tree → canvas sync: outline the card whose tree row is hovered, with a dashed
+// accent ring so it reads differently from the solid focus ring. No-op when the
+// card isn't the focus and isn't currently on screen.
+function drawHoverHighlight(): void {
+  if (!hoverNode || hoverNode === panelFocusNode) return;
+  const r = findRect(hoverNode);
+  if (!r) return;
+  const sx = toScreenX(r.x);
+  const sy = toScreenY(r.y);
+  const sw = r.w * cam.zoom;
+  const sh = r.h * cam.zoom;
+  if (sx + sw < 0 || sy + sh < 0 || sx > viewW || sy > viewH) return;
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath();
+  ctx.roundRect(sx, sy, sw, sh, Math.min(16, sw * 0.05));
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = rgba(theme.accent, 0.9);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawDropIndicator(f: Focus): void {
   if (!drag) return;
   const d = drag;
@@ -1555,6 +1622,7 @@ function frame(now: number): void {
   } else {
     focusRing(focus, false);
   }
+  drawHoverHighlight();
 
   updatePanel(path);
   hud.textContent = `${cam.zoom.toFixed(2)}×  ·  ${drawn} cards  ·  ${fps.toFixed(0)} fps`;
