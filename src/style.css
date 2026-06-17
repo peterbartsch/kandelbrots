@@ -620,13 +620,85 @@ body {
   gap: 8px;
 }
 
-/* On narrow screens (tablet/phone) drop the left rail; canvas + inspector remain. */
+/* Drawer toggles + scrim are mobile-only; hidden on desktop. */
+#nav-toggle,
+#panel-toggle,
+#drawer-scrim {
+  display: none;
+}
+
+/* On narrow screens (phone / tablet portrait) the canvas goes full-width and the
+   two rails become slide-in drawers, toggled by the corner buttons. */
 @media (max-width: 900px) {
-  :root {
-    --nav-w: 0px;
+  #stage {
+    left: 0;
+    width: 100vw;
+  }
+
+  #nav,
+  #panel {
+    z-index: 60;
+    width: min(86vw, 360px);
+    transition: transform 0.24s ease;
+    box-shadow: 0 0 44px rgba(0, 0, 0, 0.6);
   }
   #nav {
-    display: none;
+    transform: translateX(-101%);
+  }
+  #panel {
+    transform: translateX(101%);
+  }
+  body.nav-open #nav,
+  body.panel-open #panel {
+    transform: translateX(0);
+  }
+
+  /* the toolbar flows inside the board drawer instead of floating over the canvas */
+  #toolbar {
+    position: static;
+    flex-wrap: wrap;
+    padding: 0;
+  }
+
+  /* corner toggles (below the scrim so an open drawer covers them — tap scrim to close) */
+  #nav-toggle,
+  #panel-toggle {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 12px;
+    z-index: 45;
+    padding: 10px 14px;
+    font: 11px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--line));
+    background: var(--panel-bg);
+    border: 1px solid rgb(var(--line) / 0.5);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #nav-toggle {
+    left: 12px;
+  }
+  #panel-toggle {
+    right: 12px;
+  }
+
+  /* scrim behind an open drawer — tap to dismiss */
+  #drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  body.nav-open #drawer-scrim,
+  body.panel-open #drawer-scrim {
+    display: block;
+  }
+
+  #hint {
+    display: none; /* the desktop hint mentions Tab — irrelevant on touch */
   }
 }
 

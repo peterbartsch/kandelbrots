@@ -15,6 +15,12 @@
         <div class="brand">KANDELBROT</div>
         <input id="tree-search" type="search" placeholder="Search tasks…" spellcheck="false" autocomplete="off" />
       </div>
+      <div id="toolbar">
+        <button id="open-dir-btn" type="button">Folder</button>
+        <button id="import-btn" type="button">Import</button>
+        <button id="export-btn" type="button">Export</button>
+        <button id="mode-toggle" type="button">Navigate</button>
+      </div>
       <div id="tree-wrap">
         <div class="pi-label">Board</div>
         <div id="tree"></div>
@@ -58,12 +64,10 @@
       </div>
     </aside>
 
-    <div id="toolbar">
-      <button id="open-dir-btn" type="button">Folder</button>
-      <button id="import-btn" type="button">Import</button>
-      <button id="export-btn" type="button">Export</button>
-      <button id="mode-toggle" type="button">Navigate</button>
-    </div>
+    <!-- mobile-only drawer controls (hidden on desktop via CSS) -->
+    <button id="nav-toggle" type="button" aria-label="Board menu">Board</button>
+    <button id="panel-toggle" type="button" aria-label="Focus details">Focus</button>
+    <div id="drawer-scrim"></div>
     <input id="file-input" type="file" accept=".md,text/markdown" hidden />
     <div id="hint" class="overlay">drag to pan · scroll / pinch to zoom · Tab to arrange this card</div>
     <input id="rename-input" type="text" spellcheck="false" autocomplete="off" />

@@ -245,6 +245,27 @@ treeSearch.addEventListener('keydown', (e) => {
   }
 });
 
+// --- Mobile drawers ---------------------------------------------------------
+// On phones/tablets the rails are off-canvas; the corner buttons slide them in,
+// and any navigation (or a scrim tap) closes them so the board is unobstructed.
+const navToggle = document.getElementById('nav-toggle')!;
+const panelToggle = document.getElementById('panel-toggle')!;
+const drawerScrim = document.getElementById('drawer-scrim')!;
+function closeDrawers(): void {
+  document.body.classList.remove('nav-open', 'panel-open');
+}
+navToggle.addEventListener('click', () => {
+  const open = document.body.classList.contains('nav-open');
+  closeDrawers();
+  if (!open) document.body.classList.add('nav-open');
+});
+panelToggle.addEventListener('click', () => {
+  const open = document.body.classList.contains('panel-open');
+  closeDrawers();
+  if (!open) document.body.classList.add('panel-open');
+});
+drawerScrim.addEventListener('click', closeDrawers);
+
 // --- Theme application ------------------------------------------------------
 const THEME_KEY = 'kandelbrot.theme.v2'; // v2: forget the old default that used to auto-persist on first load
 function applyTheme(key: string, persist = true): void {
@@ -1049,6 +1070,7 @@ function buildTree(): void {
       const r = findRect(n);
       if (r) flyTo(r);
       refreshPanel();
+      closeDrawers();
     });
     treeEl.appendChild(row);
 
@@ -1087,6 +1109,7 @@ function buildPath(path: Focus[]): void {
       crumb.addEventListener('click', () => {
         const r = findRect(p.node);
         if (r) flyTo(r);
+        closeDrawers();
       });
     }
     piPath.append(crumb);
@@ -1113,6 +1136,7 @@ function buildTasks(f: Node): void {
         refreshPanel();
         const r = findRect(f); // follow the card to its new column
         if (r) flyTo(r);
+        closeDrawers();
       });
       row.append(b);
     }
@@ -1141,6 +1165,7 @@ function buildTasks(f: Node): void {
     row.addEventListener('click', () => {
       const r = findRect(c);
       if (r) flyTo(r);
+      closeDrawers();
     });
     taskListEl.append(row);
   }
