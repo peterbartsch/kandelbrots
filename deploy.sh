@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 REMOTE="dreamhost"
-DEST="kandelbrot.petebartsch.com"
+DEST="kandelbrot.com"
 export COPYFILE_DISABLE=1 # keep macOS from stuffing ._ AppleDouble files into the tar
 
 echo "▸ Building…"
