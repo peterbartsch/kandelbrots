@@ -4,6 +4,8 @@ A recursive, "fractal" kanban: every card lives in a **To-do / Doing / Done** bo
 and zooming into it reveals its children as their own board — all the way down.
 *Kanban + Mandelbrot.* Live at [kandelbrots.com](https://kandelbrots.com).
 
+![Kandelbrot — fractal kanban](docs/screenshot.jpg)
+
 ## What it is
 
 - **Infinite spatial canvas** — pan, pinch-zoom, and scroll-to-zoom over a world of nested boards rendered on a single `<canvas>`. No DOM node per card; custom camera with off-screen culling keeps it smooth at any depth.
