@@ -1,10 +1,10 @@
-# Kandalbrots
+# Kandelbrots
 
 A recursive, "fractal" kanban: every card lives in a **To-do / Doing / Done** board,
 and zooming into it reveals its children as their own board — all the way down.
 *Kanban + Mandelbrot.* Live at [kandelbrots.com](https://kandelbrots.com).
 
-![Kandalbrots — fractal kanban](docs/screenshot.jpg)
+![Kandelbrots — fractal kanban](docs/screenshot.jpg)
 
 ## What it is
 
