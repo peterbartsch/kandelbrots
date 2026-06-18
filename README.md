@@ -39,7 +39,7 @@ Builds with Vite and ships to Dreamhost via a single SSH tarball stream (faster 
 ./deploy.sh
 ```
 
-Requires an SSH alias `dreamhost` pointing at `tronicadmin@petebartsch.com`. Deploys to `~/kandelbrots.com/` on Dreamhost.
+Requires an SSH alias `dreamhost` pointing at `tronicadmin@petebartsch.com`. Deploys to `~/kandelbrots.com/` on Dreamhost. Repo: [github.com/peterbartsch/kandelbrots](https://github.com/peterbartsch/kandelbrots).
 
 ## Tech
 
