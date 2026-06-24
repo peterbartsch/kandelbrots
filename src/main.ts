@@ -1,4 +1,5 @@
 import './style.css';
+import { prepareWithSegments, walkLineRanges, materializeLineRange } from '@chenglou/pretext';
 
 // Kandelbrot — Step 2 + focus & Arrange mode.
 //
@@ -1305,18 +1306,62 @@ function cardShell(sx: number, sy: number, sw: number, sh: number): void {
   glow(theme.line, 0.5, sw < 90 ? 0.7 : 1);
 }
 
-function cardTitle(sx: number, sy: number, sw: number, sh: number, title: string): void {
+function cardTitle(sx: number, sy: number, sw: number, sh: number, title: string, node: Node | null): void {
   const pad = sw * 0.08;
-  const titleH = sh * 0.14;
-  const fontPx = Math.max(7, Math.min(titleH * 0.62, 24));
-  ctx.fillStyle = theme.text;
-  ctx.font = `${fontPx}px ui-monospace, "SF Mono", Menlo, monospace`;
+  const maxW = sw - pad * 2;
+  const titleH = sh * 0.18; // slightly taller to allow two wrapped lines
+  const fontPx = Math.max(7, Math.min(titleH * 0.48, 24));
+  const font = `${fontPx}px ui-monospace, "SF Mono", Menlo, monospace`;
+  const lineH = fontPx * 1.38;
+
+  ctx.font = font;
   ctx.textBaseline = 'middle';
+  ctx.fillStyle = theme.text;
+
+  const lines = rezLines(title, font, maxW);
+
+  // Determine rez-in animation state
+  let animating = false;
+  let elapsed = 0;
+  if (node !== null) {
+    if (!rezMap.has(node)) rezMap.set(node, nowMs);
+    elapsed = nowMs - rezMap.get(node)!;
+    const totalChars = lines.reduce((s, l) => s + l.length, 0);
+    animating = elapsed < totalChars * REZ_STAGGER + REZ_CHAR_MS;
+  }
+
   ctx.save();
   ctx.beginPath();
-  ctx.rect(sx + pad, sy, sw - pad * 2, titleH * 1.5);
+  ctx.rect(sx + pad, sy, maxW, titleH * 1.5);
   ctx.clip();
-  ctx.fillText(title, sx + pad, sy + titleH * 0.62);
+
+  // Monospace: measure once, reuse — avoids a measureText call per character per frame.
+  const charW = ctx.measureText('M').width;
+
+  let charIdx = 0;
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const lineY = sy + titleH * 0.32 + li * lineH;
+
+    if (animating) {
+      let cx = sx + pad;
+      for (let ci = 0; ci < line.length; ci++) {
+        const t = Math.max(0, Math.min(1, (elapsed - charIdx * REZ_STAGGER) / REZ_CHAR_MS));
+        if (t > 0) {
+          const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+          ctx.globalAlpha = eased;
+          ctx.fillText(line[ci], cx, lineY + (1 - eased) * (-fontPx * 0.55));
+        }
+        cx += charW;
+        charIdx++;
+      }
+    } else {
+      ctx.fillText(line, sx + pad, lineY);
+      charIdx += line.length;
+    }
+  }
+
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
@@ -1345,6 +1390,7 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
 
   const eff = effectiveStatus(node);
   if (sw < 5) {
+    rezMap.delete(node); // reset so it re-animates next time it grows into view
     ctx.fillStyle = statusColor(eff);
     ctx.fillRect(sx, sy, Math.max(1, sw), Math.max(1, sh));
     return;
@@ -1352,7 +1398,7 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
 
   cardShell(sx, sy, sw, sh);
   if (sw < 34) return;
-  cardTitle(sx, sy, sw, sh, node.title);
+  cardTitle(sx, sy, sw, sh, node.title, node);
 
   if (sw >= BOARD_MIN && node.children.length > 0) {
     const b = interior({ x, y, w, h });
@@ -1479,7 +1525,7 @@ function drawLifted(): void {
   ctx.shadowOffsetY = 6;
   cardShell(sx, sy, sw, sh);
   ctx.shadowColor = 'transparent';
-  cardTitle(sx, sy, sw, sh, drag.node.title);
+  cardTitle(sx, sy, sw, sh, drag.node.title, null); // null = no rez-in while dragging
   ctx.restore();
 }
 
@@ -1525,6 +1571,32 @@ function startSnap(now: number): void {
   };
 }
 
+// --- Rez-in animation -------------------------------------------------------
+// When a card first becomes large enough to show its title, characters reveal
+// one-by-one: each drops in from slightly above and fades to full opacity,
+// staggered left-to-right. Pretext handles line-breaking so long titles wrap
+// correctly instead of being clipped.
+
+let nowMs = 0; // set at the top of frame() from the rAF timestamp
+const rezMap = new Map<Node, number>(); // node → timestamp of first appearance
+const REZ_STAGGER = 38; // ms between consecutive characters
+const REZ_CHAR_MS = 200; // ms for each character's opacity + y-drop
+
+const linesCache = new Map<string, string[]>();
+function rezLines(title: string, font: string, maxW: number): string[] {
+  // Quantise maxW to 4 px buckets — avoids re-preparing on every tiny zoom tick.
+  const w = Math.round(maxW / 4) * 4;
+  const key = `${title}\x00${font}\x00${w}`;
+  if (!linesCache.has(key)) {
+    const prep = prepareWithSegments(title, font);
+    const out: string[] = [];
+    walkLineRanges(prep, w, (r) => out.push(materializeLineRange(prep, r).text));
+    linesCache.set(key, out);
+    if (linesCache.size > 400) linesCache.clear(); // never grows unbounded
+  }
+  return linesCache.get(key)!;
+}
+
 // --- Render loop ------------------------------------------------------------
 let lastFrame = performance.now();
 let fps = 60;
@@ -1532,6 +1604,7 @@ let drawn = 0;
 let pulse = 1;
 
 function frame(now: number): void {
+  nowMs = now;
   const dt = now - lastFrame;
   lastFrame = now;
   if (dt > 0) fps = fps * 0.9 + (1000 / dt) * 0.1;
