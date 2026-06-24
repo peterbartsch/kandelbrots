@@ -661,6 +661,7 @@ function commitDrag(): void {
   const cur = arr.indexOf(drag.node);
   if (cur >= 0) arr.splice(cur, 1);
   drag.node.status = status;
+  rippleMap.set(drag.node, { at: performance.now(), status });
   if (drag.node.children.length > 0) drag.node.pinned = true; // overriding a parent pins it
 
   const targetIdxs: number[] = [];
@@ -914,7 +915,7 @@ canvas.addEventListener('dblclick', (e) => {
   // Double-click brings a card into view. Double-click the card you're already
   // focused on → rename it instead (you're already there).
   if (target.node === panelFocusNode) openRename(target);
-  else flyTo(target);
+  else { scatterMap.set(target.node, performance.now()); flyTo(target); }
 });
 
 addCardBtn.addEventListener('click', () => {
@@ -1133,6 +1134,7 @@ function buildTasks(f: Node): void {
       b.textContent = COLUMN_LABEL[s];
       b.addEventListener('click', () => {
         f.status = s;
+        rippleMap.set(f, { at: performance.now(), status: s });
         persist();
         refreshPanel();
         const r = findRect(f); // follow the card to its new column
@@ -1309,59 +1311,122 @@ function cardShell(sx: number, sy: number, sw: number, sh: number): void {
 function cardTitle(sx: number, sy: number, sw: number, sh: number, title: string, node: Node | null): void {
   const pad = sw * 0.08;
   const maxW = sw - pad * 2;
-  const titleH = sh * 0.18; // slightly taller to allow two wrapped lines
+  const titleH = sh * 0.18;
   const fontPx = Math.max(7, Math.min(titleH * 0.48, 24));
   const font = `${fontPx}px ui-monospace, "SF Mono", Menlo, monospace`;
   const lineH = fontPx * 1.38;
 
   ctx.font = font;
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = theme.text;
 
   const lines = rezLines(title, font, maxW);
+  const charW = ctx.measureText('M').width; // monospace: one measurement reused for all
 
-  // Determine rez-in animation state
-  let animating = false;
-  let elapsed = 0;
+  // --- gather animation state for this node ---
+  let rezElapsed = -1;
+  let ripple: { at: number; status: Status } | null = null;
+  let scatterAt = -1;
+  const shimmer = node !== null && node === panelFocusNode;
+
   if (node !== null) {
     if (!rezMap.has(node)) rezMap.set(node, nowMs);
-    elapsed = nowMs - rezMap.get(node)!;
+    const rezAge = nowMs - rezMap.get(node)!;
     const totalChars = lines.reduce((s, l) => s + l.length, 0);
-    animating = elapsed < totalChars * REZ_STAGGER + REZ_CHAR_MS;
+    if (rezAge < totalChars * REZ_STAGGER + REZ_CHAR_MS) rezElapsed = rezAge;
+
+    const rip = rippleMap.get(node);
+    if (rip) {
+      const ripAge = nowMs - rip.at;
+      if (ripAge < totalChars * RIPPLE_STAGGER + RIPPLE_CHAR_MS) ripple = rip;
+    }
+
+    const sa = scatterMap.get(node);
+    if (sa !== undefined && nowMs - sa < SCATTER_MS) scatterAt = sa;
   }
+
+  const perChar = rezElapsed >= 0 || ripple !== null || scatterAt >= 0 || shimmer;
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(sx + pad, sy, maxW, titleH * 1.5);
   ctx.clip();
 
-  // Monospace: measure once, reuse — avoids a measureText call per character per frame.
-  const charW = ctx.measureText('M').width;
+  if (!perChar) {
+    ctx.fillStyle = theme.text;
+    for (let li = 0; li < lines.length; li++) {
+      ctx.fillText(lines[li], sx + pad, sy + titleH * 0.32 + li * lineH);
+    }
+    ctx.restore();
+    return;
+  }
 
   let charIdx = 0;
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
     const lineY = sy + titleH * 0.32 + li * lineH;
+    let cx = sx + pad;
 
-    if (animating) {
-      let cx = sx + pad;
-      for (let ci = 0; ci < line.length; ci++) {
-        const t = Math.max(0, Math.min(1, (elapsed - charIdx * REZ_STAGGER) / REZ_CHAR_MS));
-        if (t > 0) {
-          const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
-          ctx.globalAlpha = eased;
-          ctx.fillText(line[ci], cx, lineY + (1 - eased) * (-fontPx * 0.55));
-        }
-        cx += charW;
-        charIdx++;
+    for (let ci = 0; ci < line.length; ci++) {
+      let xOff = 0, yOff = 0, alpha = 1;
+
+      if (rezElapsed >= 0) {
+        // Rez-in: characters drop in from above, staggered
+        const t = Math.max(0, Math.min(1, (rezElapsed - charIdx * REZ_STAGGER) / REZ_CHAR_MS));
+        const e = 1 - Math.pow(1 - t, 3);
+        alpha = e;
+        yOff = (1 - e) * (-fontPx * 0.55);
+      } else if (scatterAt >= 0) {
+        // Scatter: radiate outward then gather back (sin curve peaks at t=0.5)
+        const t = Math.min(1, (nowMs - scatterAt) / SCATTER_MS);
+        const dist = SCATTER_RADIUS * Math.sin(t * Math.PI);
+        const angle = charIdx * 2.399963; // golden angle → even spread
+        xOff = Math.cos(angle) * dist;
+        yOff = Math.sin(angle) * dist;
+        alpha = 1 - Math.sin(t * Math.PI) * 0.35;
       }
-    } else {
-      ctx.fillText(line, sx + pad, lineY);
-      charIdx += line.length;
+
+      if (alpha > 0.01) {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = theme.text;
+        ctx.fillText(line[ci], cx + xOff, lineY + yOff);
+
+        // Ripple: status colour wave sweeps left-to-right over the settled text
+        if (ripple) {
+          const bell = Math.sin(
+            Math.max(0, Math.min(1, (nowMs - ripple.at - charIdx * RIPPLE_STAGGER) / RIPPLE_CHAR_MS)) * Math.PI
+          );
+          if (bell > 0.01) {
+            const col = ripple.status === 'done' ? theme.done : ripple.status === 'doing' ? theme.doing : theme.todo;
+            ctx.globalAlpha = alpha * bell * 0.9;
+            ctx.fillStyle = rgba(col, 1);
+            ctx.fillText(line[ci], cx + xOff, lineY + yOff);
+          }
+        }
+
+        // Shimmer: slow luminous sweep across the focused card's title
+        if (shimmer && rezElapsed < 0 && scatterAt < 0) {
+          const lineW = charW * line.length;
+          const sweepX = ((nowMs / SHIMMER_PERIOD) % 1) * (maxW + lineW);
+          const charCx = cx - (sx + pad) + charW * 0.5;
+          const dist2 = Math.abs(charCx - sweepX);
+          const shimW = lineW * 0.28;
+          const shimT = Math.max(0, 1 - dist2 / shimW);
+          const shimA = shimT * shimT * 0.5;
+          if (shimA > 0.01) {
+            ctx.globalAlpha = shimA;
+            ctx.fillStyle = rgb(theme.lineCore);
+            ctx.fillText(line[ci], cx + xOff, lineY + yOff);
+          }
+        }
+
+        ctx.globalAlpha = 1;
+      }
+
+      cx += charW;
+      charIdx++;
     }
   }
 
-  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
@@ -1390,7 +1455,9 @@ function drawNode(node: Node, x: number, y: number, w: number, h: number): void 
 
   const eff = effectiveStatus(node);
   if (sw < 5) {
-    rezMap.delete(node); // reset so it re-animates next time it grows into view
+    rezMap.delete(node);
+    rippleMap.delete(node);
+    scatterMap.delete(node);
     ctx.fillStyle = statusColor(eff);
     ctx.fillRect(sx, sy, Math.max(1, sw), Math.max(1, sh));
     return;
@@ -1584,7 +1651,6 @@ const REZ_CHAR_MS = 200; // ms for each character's opacity + y-drop
 
 const linesCache = new Map<string, string[]>();
 function rezLines(title: string, font: string, maxW: number): string[] {
-  // Quantise maxW to 4 px buckets — avoids re-preparing on every tiny zoom tick.
   const w = Math.round(maxW / 4) * 4;
   const key = `${title}\x00${font}\x00${w}`;
   if (!linesCache.has(key)) {
@@ -1592,10 +1658,25 @@ function rezLines(title: string, font: string, maxW: number): string[] {
     const out: string[] = [];
     walkLineRanges(prep, w, (r) => out.push(materializeLineRange(prep, r).text));
     linesCache.set(key, out);
-    if (linesCache.size > 400) linesCache.clear(); // never grows unbounded
+    if (linesCache.size > 400) linesCache.clear();
   }
   return linesCache.get(key)!;
 }
+
+// Status-change ripple: a wave of the new status colour sweeps left-to-right
+// through the title characters when a card's status is set.
+const rippleMap = new Map<Node, { at: number; status: Status }>();
+const RIPPLE_STAGGER = 48; // ms between chars
+const RIPPLE_CHAR_MS = 320; // each char's flash duration
+
+// Fly-to scatter: characters radiate outward then gather back as the camera
+// dives into the double-clicked card.
+const scatterMap = new Map<Node, number>(); // node → scatter start timestamp
+const SCATTER_MS = 580;    // total scatter duration (matches FLY_MS closely)
+const SCATTER_RADIUS = 64; // peak screen-pixel displacement
+
+// Shimmer: a slow bright sweep across the focused card's title (always on).
+const SHIMMER_PERIOD = 3200; // ms per full sweep
 
 // --- Render loop ------------------------------------------------------------
 let lastFrame = performance.now();
